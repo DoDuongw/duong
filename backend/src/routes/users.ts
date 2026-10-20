@@ -12,11 +12,53 @@ import {
   SNOOZE_MINUTES_MAX,
   SNOOZE_MINUTES_MIN,
 } from '../utils/preferences';
+import { ADDRESS_MAX_LENGTH, PHONE_LOCAL_PART_LENGTH, normalizePhone } from '../utils/profile';
 
 const router = Router();
 
+/** SĐT hồ sơ: chuẩn hoá về `0xxxxxxxxx`; `null`/rỗng = xoá SĐT */
+const phoneField = z
+  .string()
+  .max(20)
+  .nullish()
+  .transform((value, ctx) => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    const normalized = normalizePhone(trimmed);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Số điện thoại không hợp lệ (cần ${PHONE_LOCAL_PART_LENGTH} chữ số, ví dụ 0912345678)`,
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
+
+/** Địa chỉ: 1–200 ký tự; `null`/rỗng = xoá địa chỉ */
+const addressField = z
+  .string()
+  .max(ADDRESS_MAX_LENGTH)
+  .nullish()
+  .transform((value, ctx) => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    if (trimmed.length > ADDRESS_MAX_LENGTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Địa chỉ tối đa ${ADDRESS_MAX_LENGTH} ký tự`,
+      });
+      return z.NEVER;
+    }
+    return trimmed;
+  });
+
 const syncSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
+  phone: phoneField.optional(),
+  address: addressField.optional(),
   timezone: z.string().min(1).max(50).optional(),
   preferences: z.record(z.unknown()).optional(),
 });
@@ -28,15 +70,15 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
     if (!parsed.success) throw badRequest(parsed.error.errors.map((e) => e.message).join('; '));
 
     const { uid } = req.user!;
-    const phone = (req.body && req.body.phone) || null;
 
     let user = await User.findOne({ firebase_uid: uid });
     if (!user) {
       try {
         user = await User.create({
           firebase_uid: uid,
-          phone,
+          phone: parsed.data.phone ?? null,
           display_name: parsed.data.displayName ?? null,
+          address: parsed.data.address ?? null,
           timezone: parsed.data.timezone ?? env.TZ_DEFAULT,
           preferences: parsed.data.preferences ?? null,
         });
@@ -51,6 +93,8 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
     } else {
       const updates: Record<string, unknown> = {};
       if (parsed.data.displayName !== undefined) updates.display_name = parsed.data.displayName;
+      if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
+      if (parsed.data.address !== undefined) updates.address = parsed.data.address;
       if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
       if (parsed.data.preferences !== undefined) updates.preferences = parsed.data.preferences;
       if (Object.keys(updates).length > 0) {
@@ -63,6 +107,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
       id: user!._id,
       phone: user!.phone,
       displayName: user!.display_name,
+      address: user!.address,
       timezone: user!.timezone,
       preferences: user!.preferences,
     });
@@ -79,6 +124,7 @@ router.get('/me', requireAuthMiddleware, async (req: Request, res: Response, nex
       id: user._id,
       phone: user.phone,
       displayName: user.display_name,
+      address: user.address,
       timezone: user.timezone,
       preferences: user.preferences,
     });
@@ -89,6 +135,8 @@ router.get('/me', requireAuthMiddleware, async (req: Request, res: Response, nex
 
 const patchSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
+  phone: phoneField.optional(),
+  address: addressField.optional(),
   timezone: z.string().min(1).max(50).optional(),
   preferences: z.record(z.unknown()).optional(),
 });
@@ -99,6 +147,8 @@ router.patch('/me', requireAuthMiddleware, async (req: Request, res: Response, n
     if (!parsed.success) throw badRequest(parsed.error.errors.map((e) => e.message).join('; '));
     const updates: Record<string, unknown> = {};
     if (parsed.data.displayName !== undefined) updates.display_name = parsed.data.displayName;
+    if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
+    if (parsed.data.address !== undefined) updates.address = parsed.data.address;
     if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
     if (parsed.data.preferences !== undefined) updates.preferences = parsed.data.preferences;
 
@@ -108,6 +158,7 @@ router.patch('/me', requireAuthMiddleware, async (req: Request, res: Response, n
       id: user._id,
       phone: user.phone,
       displayName: user.display_name,
+      address: user.address,
       timezone: user.timezone,
       preferences: user.preferences,
     });
