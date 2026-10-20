@@ -22,20 +22,21 @@ Ngày kiểm tra: 19/10/2026
 
 ## Rủi ro
 
-1. **Git không sẵn sàng**: quy tắc “mỗi giai đoạn một nhánh Git” trong BUILD_ROADMAP không thực hiện được cho tới khi cài Git.
+1. ~~Git không sẵn sàng~~ **Đã giải quyết 20/10/2026**: Git 2.55.0 đã cài (winget), repo khởi tạo tại `D:\duong`, nhánh `main` = trạng thái GĐ0–7; quy tắc “mỗi giai đoạn một nhánh Git” áp dụng được từ GĐ8.
 2. ~~Firebase chưa cấu hình~~ **Đã giải quyết 20/10/2026**: Email/Mật khẩu đã bật, Admin SDK nạp được service account, luồng đăng nhập thật đã kiểm chứng đầu-cuối.
 3. **iOS/PWA**: Web Push trên iOS Safari chỉ chạy khi “Thêm vào màn hình chính”; chưa rõ có thiết bị iOS để kiểm thử (Q2).
 4. **Node 24**: khá mới — kiểm tra tương thích thư viện khi cài.
-5. **Khóa service account đã từng bị in ra console** trong lúc gỡ lỗi → khuyến nghị xoay (rotate) khóa trong Firebase Console rồi thay `backend/serviceAccountKey.json`.
+5. ~~Khóa service account đã từng bị in ra console~~ **Đã xử lý 20/10/2026**: khóa mới tạo và thay vào `backend/serviceAccountKey.json`, đã kiểm chứng kết nối Firebase Auth OK. Còn lại (thao tác tay trên Console): **xóa khóa cũ** trong danh sách nếu chưa xóa.
 
 ## Việc cần làm
 
-1. Cài Git (khuyến nghị) hoặc chấp nhận không dùng Git.
+1. ~~Cài Git~~ **Đã xong 20/10/2026** (Git 2.55.0, repo khởi tạo, nhánh `main`).
 2. Khởi tạo `backend/` (Express + TypeScript + Mongoose + MongoDB) — **đã xong** (đổi từ Sequelize/MySQL 19/10/2026).
-3. Gỡ `mobile/` (React Native) và khởi tạo `web/` (React + Vite + TypeScript + PWA, responsive mobile-first) — **đã xong cả hai** (đổi nền tảng 19/10/2026; `web/` có điều hướng, khung M01–M08, đăng nhập Firebase).
-4. Tạo tài khoản Firebase, bật Auth (Email/Password) + FCM Web Push (VAPID key), lấy credentials — **Auth đã xong và kiểm chứng**; FCM Web Push còn lại ở Giai đoạn 5.
-5. Xoay khóa service account (vì khóa cũ từng bị in ra console khi gỡ lỗi).
+3. Gỡ `mobile/` (React Native) và khởi tạo `web/` (React + Vite + TypeScript + PWA, responsive mobile-first) — **đã xong cả hai** (đổi nền tảng 19/10/2026; `web/` có 8 màn hình đã nối API thật, đăng nhập Firebase).
+4. Tạo tài khoản Firebase, bật Auth (Email/Password) + FCM Web Push (VAPID key), lấy credentials — **đã xong** (Auth kiểm chứng thật; VAPID key đã tạo 20/10/2026).
+5. ~~Xoay khóa service account~~ **Đã xong 20/10/2026** (khóa mới đã thay, kết nối Firebase Auth OK; còn thao tác tay: xóa khóa cũ trên Console).
 6. ~~Nối API thật vào M01–M06 (Giai đoạn 4)~~ **Đã xong 20/10/2026** (xem Nhật ký BUILD).
+7. **Còn lại (không tự động hoá được)**: N7 (push iOS) và N12 (push người thân) — cần thiết bị/tài khoản thật.
 
 ## Nhật ký BUILD
 
