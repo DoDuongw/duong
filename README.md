@@ -2,7 +2,7 @@
 
 Dự án gồm `backend/` (Node.js + Express + TypeScript + MongoDB) và `web/` (React + Vite + TypeScript, website responsive mobile-first + PWA). Tài liệu thiết kế nằm trong `docs/`.
 
-> **Giai đoạn hiện tại**: PLAN hoàn tất; **Giai đoạn 2 (nền tảng kỹ thuật) đã xong khung** — backend có nghiệp vụ + test, `web/` có điều hướng, 8 màn hình M01–M08, đăng nhập Firebase (chờ credentials). Chưa: dữ liệu thật trên màn hình (GĐ4), Web Push (GĐ5).
+> **Giai đoạn hiện tại**: **Giai đoạn 8 (hoàn thiện và bàn giao) đang tiến hành** — Giai đoạn 0–7 đã xong: backend có đủ nghiệp vụ (thuốc, lịch, lần uống, thông báo, người thân) + **105 test**; `web/` có 8 màn hình M01–M08 **đã nối API thật**, đăng nhập Firebase thật, Web Push code + cấu hình xong. Còn lại: 2 kịch bản push cần thiết bị thật (N7 iOS, N12 2 tài khoản) và bàn giao.
 
 ## Quyết định đã đổi (19/10/2026)
 
@@ -34,7 +34,7 @@ Kiểm tra: `GET http://localhost:3000/health`
 ### Kiểm thử
 
 ```bash
-npm test        # 21 test (mongodb-memory-server: dịch vụ trạng thái + API tích hợp)
+npm test        # 105 test (mongodb-memory-server: dịch vụ trạng thái + API tích hợp)
 npm run lint    # typecheck
 ```
 
@@ -60,9 +60,9 @@ Ghi chú test: chạy trên mongodb-memory-server (MongoDB trong bộ nhớ) đ�
 
 Backend chỉ dùng Admin SDK để **xác minh ID token**; không cần Web API key ở backend.
 
-Chưa cấu hình Firebase: server vẫn chạy, `/health` hoạt động, mọi endpoint cần đăng nhập trả 401.
+**Nếu chưa cấu hình Firebase** (dự án mới): server vẫn chạy, `/health` hoạt động, mọi endpoint cần đăng nhập trả 401.
 
-## Web (website responsive — Giai đoạn 2: khung xong)
+## Web (website responsive — GĐ4–GĐ6: đã nối API thật)
 
 ### Yêu cầu
 
@@ -83,8 +83,8 @@ npm run build && npm run preview
 Cấu hình Firebase cho web:
 
 1. Firebase Console → Project settings → General → **Your apps** → thêm **Web app** (`</>`) → copy khối `firebaseConfig` → điền 6 biến `VITE_FIREBASE_*` trong `web/.env`.
-2. Cloud Messaging → **Web Push certificates** → tạo **VAPID key** → điền `VITE_FIREBASE_VAPID_KEY` (chỉ cần ở Giai đoạn 5).
-3. Service Worker `public/sw.js` xử lý push + `notificationclick` mở M02 (tích hợp FCM ở Giai đoạn 5).
+2. Cloud Messaging → **Web Push certificates** → tạo **VAPID key** → điền `VITE_FIREBASE_VAPID_KEY` (bắt buộc để nhận thông báo đẩy; dự án hiện tại đã có sẵn).
+3. Service Worker `public/sw.js` xử lý push + `notificationclick` mở M02 (đã tích hợp FCM).
 
 Vite nạp `web/.env` tự động — **sửa `.env` xong phải dừng/chạy lại `npm run dev`**.
 
@@ -94,7 +94,7 @@ Vite nạp `web/.env` tự động — **sửa `.env` xong phải dừng/chạy 
 
 ```bash
 npm run typecheck   # TypeScript strict
-npm test            # 28 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, component trạng thái)
+npm test            # 126 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, push/messaging)
 npm run lint        # oxlint
 ```
 
@@ -105,7 +105,9 @@ npm run lint        # oxlint
 - **Responsive mobile-first**: bottom tab bar ở viewport điện thoại (nút to, có nhãn chữ) cho 5 màn hình chính (M01, M03, M04, M06, M08); màn tác vụ tập trung (M02, M05, M07, Login) không hiện tab. Màn hình lớn chuyển nav ngang.
 - **Cỡ chữ trong M08 áp dụng thật** (component Text nhân fontSize theo preference; nút/ô giữ chiều cao ≥ 56px).
 - **Mất mạng**: dải báo đỏ trên đỉnh trang, tự kiểm tra `/health` mỗi 10 giây, tự tải lại khi có mạng; lỗi mạng không bị coi là hết hạn đăng nhập (chỉ 401/403 mới đăng xuất).
-- Component dùng chung trong `src/components/` (Button, Card, StateView: đang tải/lỗi/rỗng, DateField, TimeField, TabBar) + hook `src/hooks/useApi.ts`.
+- **Dữ liệu thật**: cả 8 màn hình đã nối API backend — M01 (`/doses/today` + xác nhận nhanh), M02 (`/doses/:id` + đã uống/nhắc lại/không thể uống), M03 (`/doses?date=`), M04 (`/medications` + ngừng thuốc), M05 (tạo/sửa thuốc + quản lý giờ uống), M06 (`/history` lọc + phân trang), M07 (`/family/*` mã mời, quyền xem, ngắt kết nối), M08 (tài khoản, cài đặt nhắc lại, âm thanh/giọng đọc, thông báo người thân).
+- **Thông báo**: server node-cron gửi Web Push đúng giờ; trang đang mở hiện banner + âm thanh (`DueBanner`); bấm notification mở M02 đúng lần uống.
+- Component dùng chung trong `src/components/` (Button, Card, StateView: đang tải/lỗi/rỗng, DateField, TimeField, TabBar, Dialog, DoseRow, DueBanner) + hook `src/hooks/` (useApi, useDueReminder, useHealth, useOwnerView).
 - **PWA**: `public/manifest.webmanifest`, Service Worker, hướng dẫn “Thêm vào màn hình chính” trong M08 (bắt buộc để nhận push trên iOS).
 
 ## Tài liệu
@@ -117,19 +119,22 @@ npm run lint        # oxlint
 | docs/DATABASE_PLAN.md | Mô hình dữ liệu |
 | docs/API_SPEC.md | Đặc tả API |
 | docs/BUSINESS_RULES.md | Quy tắc nghiệp vụ |
-| docs/NOTIFICATION_PLAN.md | Kế hoạch thông báo (Web Push + Service Worker + PWA — chưa cài ở hiện tại) |
+| docs/NOTIFICATION_PLAN.md | Kế hoạch thông báo (Web Push + Service Worker + PWA — đã cài ở Giai đoạn 5) |
 | docs/INTERFACE_SPEC.md | Đặc tả màn hình |
 | docs/TEST_PLAN.md | Kịch bản kiểm thử |
 | docs/BUILD_ROADMAP.md | Lộ trình BUILD |
 | docs/OPEN_QUESTIONS.md | Câu hỏi chờ duyệt |
 | docs/CURRENT_STATE.md | Hiện trạng kiểm tra Giai đoạn 0 |
 
-## Giới hạn đã biết
+## Kiểm thử tích hợp và giới hạn đã biết
 
-- **Màn hình chưa có dữ liệu thật** — 8 màn hình mới là khung theo INTERFACE_SPEC; nối API ở Giai đoạn 4 (M05 đã có kiểm tra đầu chạy thật).
-- **Web Push và Service Worker chưa tích hợp FCM** — Service Worker cơ bản (`web/public/sw.js`) đã có; FCM + VAPID key thuộc Giai đoạn 5.
-- **iOS Safari cần PWA**: chỉ nhận push sau khi “Thêm vào màn hình chính” (iOS ≥ 16.4); chưa có thiết bị iOS để kiểm thử (Q2).
-- **Firebase Auth Email chưa chạy thật** — cần credentials (service account cho backend + web config + VAPID key cho web); Phone Auth bị loại vì Spark plan.
+- **45/47 kịch bản TEST_PLAN đạt** (bảng chi tiết trong `TEST_PLAN.md` §7); **2/47 chưa kiểm thử** vì cần thiết bị/tài khoản thật: **N7** (push trên iOS — cần HTTPS + thiết bị iOS ≥ 16.4 + “Thêm vào màn hình chính”), **N12** (push người thân — cần 2 tài khoản/thiết bị thật).
+- **Đã kiểm chứng đầu-cuối với Firebase Auth thật** (đăng nhập → sync → tạo thuốc → sinh lần uống → xác nhận → thống kê); tài khoản kiểm thử đã xóa. Push trên trình duyệt desktop đã chạy thật (N1, N5, N8–N11).
+- **iOS Safari cần PWA**: chỉ nhận push sau khi “Thêm vào màn hình chính” (iOS ≥ 16.4); chưa có thiết bị iOS để kiểm thử.
+- **Firebase plan là Spark (miễn phí)** → Phone Auth không khả dụng, đã chọn Email/Mật khẩu.
 - **npm audit (web)**: 4 cảnh báo cao đến từ `firebase` → `@grpc/grpc-js` (lỗ hổng Firestore) — **app chỉ dùng Firebase Auth, không bundle Firestore** nên không ảnh hưởng runtime; theo dõi khi nâng firebase.
-- **Git không có sẵn trên máy** — quy tắc nhánh/commit của PLAN chưa áp dụng được.
-- **`mobile/` đã gỡ** (19/10/2026) theo quyết định chuyển sang website.
+- **Khóa service account**: file JSON là bí mật, `.gitignore` chặn commit (`*serviceAccountKey*.json`); backend chỉ dùng để xác minh ID token. Nếu nghi ngờ khóa bị lộ → xoay trong Firebase Console (Project settings → Service accounts → Generate new private key) và thay file.
+
+## Git
+
+Repo Git đã khởi tạo tại gốc dự án. Quy tắc: mỗi giai đoạn một nhánh `build/phase-N-...`, commit nhỏ; **không commit `.env`, khóa Firebase, token** (`.gitignore` đã chặn). Nhánh `main` chứa trạng thái đã bàn giao.
