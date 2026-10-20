@@ -130,6 +130,14 @@ Thứ tự: **M04 → M05 → M03 → M01 → M02 → M06**. Mỗi màn hình: n
 
 **Thay đổi phạm vi giữa chừng (R1–R3 — người dùng yêu cầu và đã duyệt, xem `TEST_PLAN.md` §7.11)**: (R1) ngưỡng báo người thân chuyển từ “khi `missed` (2 giờ)” sang **“chưa xác nhận quá 15 phút”** (`RELATIVE_ALERT_AFTER_MINUTES=15`, mốc tính từ lần nhắc lại cuối); (R2) M07 thêm nút **quay lại**; (R3) người thân **xem được lịch uống (M03) và thuốc (M04) của chủ hồ sơ** ở chế độ chỉ xem, kèm sửa 2 lỗi liên quan (`GET /doses/:id` 404 với người thân → notification relative alert không mở được; M02 không có chế độ chỉ xem). **Không thêm màn hình mới** (vẫn đúng M01–M08). Sau thay đổi: backend **105/105**, web **108/108**, lint/typecheck/build sạch.
 
+**Thay đổi phạm vi sau GĐ8 (R4 — người dùng yêu cầu và đã duyệt 20/10/2026)**: **đăng nhập bằng email HOẶC số điện thoại + đăng ký kèm SĐT & địa chỉ**.
+- **Backend**: `users.address` (trường mới); `POST /users/me/sync` và `PATCH /users/me` nhận `phone`/`address`; `utils/profile.ts` chuẩn hoá SĐT VN (`+84…`/`84…`/khoảng trắng → `0xxxxxxxxx`, đầu số 03/05/07/08/09) và validate địa chỉ ≤ 200 ký tự. SĐT sai định dạng → 400; `""`/`null` = xoá.
+- **Web**: ô đăng nhập **gộp một trường** “Email hoặc số điện thoại”; `services/firebase.ts` chuyển SĐT → **email nội bộ `<sđt>@med.local`** (Spark không có Phone Auth OTP SMS — đã chốt với người dùng); `utils/phone.ts` (chuẩn hoá dùng chung, giống hệt backend); form đăng ký thêm ô SĐT + địa chỉ (không bắt buộc, chuyển vào `POST /users/me/sync` lần đầu); **M08** hiển thị “Số điện thoại đăng nhập” khi tài khoản tạo bằng SĐT, thêm ô sửa SĐT/địa chỉ.
+- **Không thêm màn hình mới** (đăng nhập/đăng ký vẫn là bước hệ thống trước M01).
+- **Đánh đổi đã chốt**: SĐT **không được xác thực thật**; tài khoản tạo bằng SĐT **không tự khôi phục mật khẩu** được (phải liên hệ admin) — ghi rõ trong README mục Giới hạn.
+- **Kiểm thử**: backend **122/122** (8 suite, thêm `userProfile.test.ts` 17 test) + web **149/149** (17 file, thêm `phone.test.ts` + `firebaseAuth.test.ts`); typecheck/lint/build sạch; web build production OK.
+- **Nhánh**: `build/feature-auth-phone`.
+
 ### Giai đoạn 8 — Hoàn thiện và bàn giao (MVP)
 
 - README cài đặt và chạy (backend, web, CSDL, Firebase); `.env.example` không chứa giá trị thật.

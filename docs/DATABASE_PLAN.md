@@ -142,8 +142,9 @@ erDiagram
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK, auto | |
 | firebase_uid | VARCHAR(128) | UNIQUE, not null | UID Firebase Auth |
-| phone | VARCHAR(20) | | Số SĐT đã xác thực |
+| phone | VARCHAR(20) | | SĐT trong hồ sơ, chuẩn hoá `0xxxxxxxxx`. **Đồng thời là định danh đăng nhập**: tài khoản tạo bằng SĐT có email Firebase là `<sđt>@med.local` (Spark plan không có Phone Auth OTP SMS) |
 | display_name | VARCHAR(100) | | Tên hiển thị |
+| address | VARCHAR(200) | | Địa chỉ liên hệ trong hồ sơ (M08) — không bắt buộc |
 | timezone | VARCHAR(50) | default 'Asia/Ho_Chi_Minh' | Múi giờ hiển thị |
 | preferences | JSON | | Cỡ chữ, âm thanh, nhắc lại (M08). Hiện dùng: `snoozeMinutes` (5–30, mặc định 10), `snoozeMax` (1–5, mặc định 3) — backend tuân theo khi snooze |
 | created_at / updated_at | DATETIME | | UTC |

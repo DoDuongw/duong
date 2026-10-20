@@ -34,7 +34,7 @@ Kiểm tra: `GET http://localhost:3000/health`
 ### Kiểm thử
 
 ```bash
-npm test        # 21 test (mongodb-memory-server: dịch vụ trạng thái + API tích hợp)
+npm test        # 122 test (mongodb-memory-server: dịch vụ trạng thái + API tích hợp + hồ sơ SĐT/địa chỉ)
 npm run lint    # typecheck
 ```
 
@@ -42,8 +42,15 @@ Ghi chú test: chạy trên mongodb-memory-server (MongoDB trong bộ nhớ) đ�
 
 ### Firebase (xác thực — Spark plan)
 
+**Đăng nhập/đăng ký bằng email hoặc số điện thoại** (tính năng 20/10/2026):
+
+- Ô đăng nhập là **một ô duy nhất**: gõ email thì đăng nhập bằng email, gõ SĐT thì đăng nhập bằng SĐT.
+- Firebase Spark plan **không có Phone Auth (OTP SMS)**, nên SĐT được đăng nhập qua **email nội bộ `<sđt>@med.local`** (ví dụ `0912345678@med.local`). Với người dùng thì vẫn là “đăng nhập bằng SĐT”.
+- SĐT được **chuẩn hoá** (`+84912345678`, `091 234 5678` → `0912345678`) nên mọi cách gõ đều vào cùng một tài khoản.
+- **Đăng ký** có thêm ô SĐT và địa chỉ (không bắt buộc) — lưu vào hồ sơ `users.phone` / `users.address`, sửa lại được ở M08.
+
 1. Tạo dự án tại https://console.firebase.google.com — **giữ Spark plan** (miễn phí).
-2. Authentication → Sign-in method → bật **Email/Password**.
+2. Authentication → Sign-in method → bật **Email/Password**. (Không bật Phone — Spark plan không hỗ trợ; xem mục Đăng nhập bằng SĐT bên dưới.)
 3. Project settings → **Service accounts** → Generate new private key (tải file JSON). Cách dùng — chọn **một** trong hai:
 
    - **Cách 2 (dễ hơn — khuyến nghị):** thả file JSON vào `D:\duong\backend\` (ví dụ đặt tên `serviceAccountKey.json`), rồi trong `backend/.env` điền:
@@ -94,7 +101,7 @@ Vite nạp `web/.env` tự động — **sửa `.env` xong phải dừng/chạy 
 
 ```bash
 npm run typecheck   # TypeScript strict
-npm test            # 28 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, component trạng thái)
+npm test            # 149 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, push/messaging, SĐT/đăng nhập)
 npm run lint        # oxlint
 ```
 
@@ -125,6 +132,9 @@ npm run lint        # oxlint
 | docs/CURRENT_STATE.md | Hiện trạng kiểm tra Giai đoạn 0 |
 
 ## Giới hạn đã biết
+
+- **Đăng nhập bằng SĐT không xác thực SĐT**: do Spark plan không có Phone Auth (OTP SMS), SĐT đăng nhập đi qua email nội bộ `<sđt>@med.local` — hệ thống **không** kiểm chứng người dùng thật sự sở hữu số đó. Không dùng SĐT làm yếu tố bảo mật thứ hai.
+- **Quên mật khẩu**: người đăng ký bằng SĐT không có email thật → **không tự khôi phục được**, phải liên hệ quản trị viên. Người đăng ký bằng email dùng chức năng quên mật khẩu của Firebase bình thường.
 
 - **Màn hình chưa có dữ liệu thật** — 8 màn hình mới là khung theo INTERFACE_SPEC; nối API ở Giai đoạn 4 (M05 đã có kiểm tra đầu chạy thật).
 - **Web Push và Service Worker chưa tích hợp FCM** — Service Worker cơ bản (`web/public/sw.js`) đã có; FCM + VAPID key thuộc Giai đoạn 5.
