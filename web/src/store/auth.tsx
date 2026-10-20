@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const inflight = useRef<Promise<void> | null>(null);
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async (seed?: { displayName?: string; phone?: string; address?: string }) => {
     if (inflight.current) return inflight.current;
     const run = (async () => {
       try {
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         if (e instanceof ApiError && (e.status === 401 || e.status === 404)) {
           try {
-            setProfile(await syncProfile());
+            setProfile(await syncProfile(seed));
           } catch {
             // Không tạo được — màn hình dùng múi giờ mặc định
           }
@@ -75,10 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (identifier: string, password: string) => {
       setError(null);
       try {
-        await firebaseSignIn(email, password);
+        await firebaseSignIn(identifier, password);
         // Lần đăng nhập đầu: tạo bản ghi user (POST /users/me/sync) trước khi vào M01
         await loadProfile();
       } catch (e) {
@@ -90,11 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (email: string, password: string) => {
+    async (
+      identifier: string,
+      password: string,
+      extra?: { phone?: string; address?: string; displayName?: string },
+    ) => {
       setError(null);
       try {
-        await firebaseSignUp(email, password);
-        await loadProfile();
+        await firebaseSignUp(identifier, password);
+        // Truyền SĐT/địa chỉ để lần sync đầu lưu luôn vào hồ sơ backend
+        await loadProfile(extra);
       } catch (e) {
         setError(firebaseAuthMessage(e));
         throw e;
@@ -122,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       timezone: profile?.timezone ?? DEFAULT_TIMEZONE,
+      phone: profile?.phone ?? null,
       configured: isFirebaseConfigured,
       error,
       login,

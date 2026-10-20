@@ -9,6 +9,7 @@ import {
   type Unsubscribe,
 } from 'firebase/auth';
 import { firebaseConfig, isFirebaseConfigured } from '../config';
+import { normalizePhone, phoneToInternalEmail } from '../utils/phone';
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
@@ -32,12 +33,26 @@ function ensureAuth(): Auth {
   return auth;
 }
 
-export async function signIn(email: string, password: string): Promise<void> {
-  await signInWithEmailAndPassword(ensureAuth(), email, password);
+/**
+ * Người dùng gõ email hay số điện thoại?
+ *
+ * Firebase Spark plan không hỗ trợ Phone Auth (OTP SMS), nên SĐT được đăng nhập
+ * qua **email nội bộ** `<sđt>@med.local` — với người dùng thì vẫn là "đăng nhập bằng SĐT".
+ * Hàm này chuẩn hoá SĐT trước khi dựng email nên `091 234 5678` và `+84912345678`
+ * cùng vào một tài khoản.
+ */
+function toFirebaseEmail(identifier: string): string {
+  const trimmed = identifier.trim();
+  const asPhone = normalizePhone(trimmed);
+  return asPhone ? phoneToInternalEmail(asPhone) : trimmed;
 }
 
-export async function signUp(email: string, password: string): Promise<void> {
-  await createUserWithEmailAndPassword(ensureAuth(), email, password);
+export async function signIn(identifier: string, password: string): Promise<void> {
+  await signInWithEmailAndPassword(ensureAuth(), toFirebaseEmail(identifier), password);
+}
+
+export async function signUp(identifier: string, password: string): Promise<void> {
+  await createUserWithEmailAndPassword(ensureAuth(), toFirebaseEmail(identifier), password);
 }
 
 export async function signOut(): Promise<void> {

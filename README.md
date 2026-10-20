@@ -34,7 +34,7 @@ Kiểm tra: `GET http://localhost:3000/health`
 ### Kiểm thử
 
 ```bash
-npm test        # 105 test (mongodb-memory-server: dịch vụ trạng thái + API tích hợp)
+npm test        # 122 test (mongodb-memory-server: dịch vụ trạng thái + API tích hợp + hồ sơ SĐT/địa chỉ)
 npm run lint    # typecheck
 ```
 
@@ -42,8 +42,15 @@ Ghi chú test: chạy trên mongodb-memory-server (MongoDB trong bộ nhớ) đ�
 
 ### Firebase (xác thực — Spark plan)
 
+**Đăng nhập/đăng ký bằng email hoặc số điện thoại** (tính năng 20/10/2026):
+
+- Ô đăng nhập là **một ô duy nhất**: gõ email thì đăng nhập bằng email, gõ SĐT thì đăng nhập bằng SĐT.
+- Firebase Spark plan **không có Phone Auth (OTP SMS)**, nên SĐT được đăng nhập qua **email nội bộ `<sđt>@med.local`** (ví dụ `0912345678@med.local`). Với người dùng thì vẫn là “đăng nhập bằng SĐT”.
+- SĐT được **chuẩn hoá** (`+84912345678`, `091 234 5678` → `0912345678`) nên mọi cách gõ đều vào cùng một tài khoản.
+- **Đăng ký** có thêm ô SĐT và địa chỉ (không bắt buộc) — lưu vào hồ sơ `users.phone` / `users.address`, sửa lại được ở M08.
+
 1. Tạo dự án tại https://console.firebase.google.com — **giữ Spark plan** (miễn phí).
-2. Authentication → Sign-in method → bật **Email/Password**.
+2. Authentication → Sign-in method → bật **Email/Password**. (Không bật Phone — Spark plan không hỗ trợ; xem mục Đăng nhập bằng SĐT bên dưới.)
 3. Project settings → **Service accounts** → Generate new private key (tải file JSON). Cách dùng — chọn **một** trong hai:
 
    - **Cách 2 (dễ hơn — khuyến nghị):** thả file JSON vào `D:\duong\backend\` (ví dụ đặt tên `serviceAccountKey.json`), rồi trong `backend/.env` điền:
@@ -94,7 +101,7 @@ Vite nạp `web/.env` tự động — **sửa `.env` xong phải dừng/chạy 
 
 ```bash
 npm run typecheck   # TypeScript strict
-npm test            # 126 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, push/messaging)
+npm test            # 149 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, push/messaging, SĐT/đăng nhập)
 npm run lint        # oxlint
 ```
 
@@ -130,8 +137,10 @@ npm run lint        # oxlint
 
 - **45/47 kịch bản TEST_PLAN đạt** (bảng chi tiết trong `TEST_PLAN.md` §7); **2/47 chưa kiểm thử** vì cần thiết bị/tài khoản thật: **N7** (push trên iOS — cần HTTPS + thiết bị iOS ≥ 16.4 + “Thêm vào màn hình chính”), **N12** (push người thân — cần 2 tài khoản/thiết bị thật).
 - **Đã kiểm chứng đầu-cuối với Firebase Auth thật** (đăng nhập → sync → tạo thuốc → sinh lần uống → xác nhận → thống kê); tài khoản kiểm thử đã xóa. Push trên trình duyệt desktop đã chạy thật (N1, N5, N8–N11).
+- **Đăng nhập bằng SĐT không xác thực SĐT**: do Spark plan không có Phone Auth (OTP SMS), SĐT đăng nhập đi qua email nội bộ `<sđt>@med.local` — hệ thống **không** kiểm chứng người dùng thật sự sở hữu số đó. Không dùng SĐT làm yếu tố bảo mật thứ hai.
+- **Quên mật khẩu**: người đăng ký bằng SĐT không có email thật → **không tự khôi phục được**, phải liên hệ quản trị viên. Người đăng ký bằng email dùng chức năng quên mật khẩu của Firebase bình thường.
 - **iOS Safari cần PWA**: chỉ nhận push sau khi “Thêm vào màn hình chính” (iOS ≥ 16.4); chưa có thiết bị iOS để kiểm thử.
-- **Firebase plan là Spark (miễn phí)** → Phone Auth không khả dụng, đã chọn Email/Mật khẩu.
+- **Firebase plan là Spark (miễn phí)** → Phone Auth không khả dụng, nên đăng nhập dùng email hoặc SĐT qua email nội bộ.
 - **npm audit (web)**: 4 cảnh báo cao đến từ `firebase` → `@grpc/grpc-js` (lỗ hổng Firestore) — **app chỉ dùng Firebase Auth, không bundle Firestore** nên không ảnh hưởng runtime; theo dõi khi nâng firebase.
 - **Khóa service account**: file JSON là bí mật, `.gitignore` chặn commit (`*serviceAccountKey*.json`); backend chỉ dùng để xác minh ID token. Nếu nghi ngờ khóa bị lộ → xoay trong Firebase Console (Project settings → Service accounts → Generate new private key) và thay file.
 

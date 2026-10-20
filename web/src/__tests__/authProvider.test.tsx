@@ -29,6 +29,7 @@ const PROFILE: UserProfile = {
   id: 'p1',
   phone: null,
   displayName: 'Bà Lan',
+  address: null,
   timezone: 'Asia/Tokyo',
   preferences: null,
 };

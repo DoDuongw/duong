@@ -48,9 +48,9 @@
 
 | Method | Path | Quyền | Input | Output |
 |---|---|---|---|---|
-| POST | /users/me/sync | Đã đăng nhập Firebase | `{ displayName?, timezone?, preferences? }` | Tạo/cập nhật bản ghi user theo firebase_uid (idempotent) |
-| GET | /users/me | Chủ hồ sơ | — | `{ id, phone, displayName, timezone, preferences }` |
-| PATCH | /users/me | Chủ hồ sơ | `{ displayName?, timezone?, preferences? }` | Cập nhật tùy chọn M08 |
+| POST | /users/me/sync | Đã đăng nhập Firebase | `{ displayName?, phone?, address?, timezone?, preferences? }` | Tạo/cập nhật bản ghi user theo firebase_uid (idempotent). `phone` chuẩn hoá `0xxxxxxxxx` (nhận `+84…`); `phone`/`address` rỗng = null |
+| GET | /users/me | Chủ hồ sơ | — | `{ id, phone, displayName, address, timezone, preferences }` |
+| PATCH | /users/me | Chủ hồ sơ | `{ displayName?, phone?, address?, timezone?, preferences? }` | Cập nhật tùy chọn M08. `phone` sai định dạng → 400; `phone`/`address` = `""`/`null` để xoá |
 
 ### 2.3 Thuốc
 

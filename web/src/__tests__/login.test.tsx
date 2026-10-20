@@ -11,6 +11,7 @@ function authValue(overrides: Partial<AuthContextValue> = {}): AuthContextValue 
     user: null,
     profile: null,
     timezone: 'Asia/Ho_Chi_Minh',
+    phone: null,
     configured: true,
     error: null,
     login: vi.fn(),
@@ -63,7 +64,7 @@ describe('Trang giới thiệu + đăng nhập (R4)', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole('heading', { name: 'Đăng nhập' })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText(/Email/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Email hoặc số điện thoại/)).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/Mật khẩu/)).toBeInTheDocument();
   });
 
@@ -85,7 +86,7 @@ describe('Trang giới thiệu + đăng nhập (R4)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Đóng' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Email/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Email hoặc số điện thoại/)).not.toBeInTheDocument();
   });
 
   it('email không hợp lệ → báo lỗi ngay dưới trường, không gọi login', async () => {
@@ -94,7 +95,7 @@ describe('Trang giới thiệu + đăng nhập (R4)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Mở đăng nhập' }));
 
-    await userEvent.type(screen.getByLabelText(/Email/), 'khong-phai-email');
+    await userEvent.type(screen.getByLabelText(/Email hoặc số điện thoại/), 'khong-phai-email');
     await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'matkhau123');
     await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
@@ -108,7 +109,7 @@ describe('Trang giới thiệu + đăng nhập (R4)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Mở đăng nhập' }));
 
-    await userEvent.type(screen.getByLabelText(/Email/), 'lan@example.com');
+    await userEvent.type(screen.getByLabelText(/Email hoặc số điện thoại/), 'lan@example.com');
     await userEvent.type(screen.getByLabelText(/Mật khẩu/), '123');
     await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
@@ -122,23 +123,68 @@ describe('Trang giới thiệu + đăng nhập (R4)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Mở đăng nhập' }));
 
-    await userEvent.type(screen.getByLabelText(/Email/), ' lan@example.com ');
+    await userEvent.type(screen.getByLabelText(/Email hoặc số điện thoại/), ' lan@example.com ');
     await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'matkhau123');
     await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
     expect(auth.login).toHaveBeenCalledWith('lan@example.com', 'matkhau123');
   });
 
-  it('chế độ đăng ký → gọi register', async () => {
+  it('chế độ đăng ký → gọi register (không kèm SĐT/địa chỉ khi để trống)', async () => {
     const auth = authValue({ register: vi.fn().mockResolvedValue(undefined) });
     renderLogin(auth);
 
     await userEvent.click(screen.getByRole('button', { name: 'Mở đăng ký' }));
-    await userEvent.type(screen.getByLabelText(/Email/), 'moi@example.com');
+    await userEvent.type(screen.getByLabelText(/Email hoặc số điện thoại/), 'moi@example.com');
     await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'matkhau123');
     await userEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
 
-    expect(auth.register).toHaveBeenCalledWith('moi@example.com', 'matkhau123');
+    expect(auth.register).toHaveBeenCalledWith('moi@example.com', 'matkhau123', {
+      phone: undefined,
+      address: undefined,
+    });
+  });
+
+  it('đăng ký kèm SĐT + địa chỉ → chuyển tiếp cho register', async () => {
+    const auth = authValue({ register: vi.fn().mockResolvedValue(undefined) });
+    renderLogin(auth);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mở đăng ký' }));
+    await userEvent.type(screen.getByLabelText(/Email hoặc số điện thoại/), '0912345678');
+    await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'matkhau123');
+    await userEvent.type(screen.getByLabelText(/Số điện thoại/), '0987654321');
+    await userEvent.type(screen.getByLabelText(/Địa chỉ/), '12 Lê Lợi, Q.1');
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
+
+    expect(auth.register).toHaveBeenCalledWith('0912345678', 'matkhau123', {
+      phone: '0987654321',
+      address: '12 Lê Lợi, Q.1',
+    });
+  });
+
+  it('SĐT không hợp lệ ở ô đăng nhập → báo lỗi, không gọi login', async () => {
+    const auth = authValue();
+    renderLogin(auth);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mở đăng nhập' }));
+    await userEvent.type(screen.getByLabelText(/Email hoặc số điện thoại/), '0123456789');
+    await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'matkhau123');
+    await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+    expect(await screen.findByText(/Số điện thoại không hợp lệ/)).toBeInTheDocument();
+    expect(auth.login).not.toHaveBeenCalled();
+  });
+
+  it('SĐT hợp lệ → gọi login với nguyên SĐT (đổi sang email nội bộ ở lớp firebase)', async () => {
+    const auth = authValue({ login: vi.fn().mockResolvedValue(undefined) });
+    renderLogin(auth);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mở đăng nhập' }));
+    await userEvent.type(screen.getByLabelText(/Email hoặc số điện thoại/), '091 234 5678');
+    await userEvent.type(screen.getByLabelText(/Mật khẩu/), 'matkhau123');
+    await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+    expect(auth.login).toHaveBeenCalledWith('091 234 5678', 'matkhau123');
   });
 
   it('chưa cấu hình Firebase → hiện hướng dẫn cấu hình thay cho form', async () => {
@@ -147,6 +193,6 @@ describe('Trang giới thiệu + đăng nhập (R4)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Mở đăng nhập' }));
 
     expect(screen.getByText(/Chưa cấu hình Firebase/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Email/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Email hoặc số điện thoại/)).not.toBeInTheDocument();
   });
 });

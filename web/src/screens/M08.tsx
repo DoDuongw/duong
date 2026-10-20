@@ -8,6 +8,7 @@ import { useAuth } from '../store/authContext';
 import { applyFontScale, FONT_SCALE_LABEL, readFontScale, type FontScale } from '../utils/fontScale';
 import { isSoundEnabled, setSoundEnabled } from '../utils/sound';
 import { isSpeechEnabled, setSpeechEnabled, speechSupported } from '../utils/speech';
+import { isValidAddress, isValidPhone, phoneFromInternalEmail } from '../utils/phone';
 import { ApiError } from '../services/api';
 import {
   listFamilyConnections,
@@ -75,6 +76,8 @@ export function M08() {
 
   // Tài khoản
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
+  const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [address, setAddress] = useState(profile?.address ?? '');
   const [timezone, setTimezone] = useState(ctxTimezone);
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
@@ -104,13 +107,26 @@ export function M08() {
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- đồng bộ state form với hồ sơ tải từ server
     setDisplayName(profile?.displayName ?? '');
+    setPhone(profile?.phone ?? '');
+    setAddress(profile?.address ?? '');
     setTimezone(profile?.timezone ?? ctxTimezone);
     setSnoozeMinutes(Number(profile?.preferences?.snoozeMinutes ?? 10));
     setSnoozeMax(Number(profile?.preferences?.snoozeMax ?? 3));
   }, [profile, ctxTimezone]);
 
-  const loadConnections = useCallback(async () => {
-    setConnLoading(true);
+  /**
+   * Nhãn tài khoản đăng nhập ở đầu mục "Thông tin cá nhân".
+   * Tài khoản tạo bằng SĐT có `user.email` là email nội bộ `<sđt>@med.local`
+   * → hiển thị lại dạng SĐT cho dễ hiểu.
+   */
+  const accountIdentifierLabel = (() => {
+    const loggedInEmail = user?.email ?? '';
+    if (!loggedInEmail) return 'Tài khoản: —';
+    const asPhone = phoneFromInternalEmail(loggedInEmail);
+    return asPhone ? `Số điện thoại đăng nhập: ${asPhone}` : `Email: ${loggedInEmail}`;
+  })();
+
+  const loadConnections = useCallback(async () => {    setConnLoading(true);
     setConnError(null);
     try {
       const all = await listFamilyConnections();
@@ -151,11 +167,28 @@ export function M08() {
       setAccountError('Tên hiển thị không được để trống');
       return;
     }
+    // SĐT/địa chỉ không bắt buộc; nhập thì phải đúng định dạng (backend kiểm lại)
+    const phoneValue = phone.trim();
+    if (phoneValue !== '' && !isValidPhone(phoneValue)) {
+      setAccountError('Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678)');
+      return;
+    }
+    const addressValue = address.trim();
+    if (addressValue !== '' && !isValidAddress(addressValue)) {
+      setAccountError('Địa chỉ tối đa 200 ký tự');
+      return;
+    }
     setAccountBusy(true);
     setAccountError(null);
     setAccountMessage(null);
     try {
-      await updateProfile({ displayName: name, timezone });
+      await updateProfile({
+        displayName: name,
+        // '' → null để xoá hẳn giá trị đã lưu
+        phone: phoneValue === '' ? null : phoneValue,
+        address: addressValue === '' ? null : addressValue,
+        timezone,
+      });
       await refreshProfile();
       setAccountMessage('Đã lưu thông tin cá nhân.');
     } catch (e) {
@@ -236,7 +269,7 @@ export function M08() {
       {/* ================= Tài khoản ================= */}
       <Section title="Thông tin cá nhân" icon="👤">
             <Text muted style={{ marginBottom: 4 }}>
-              Email: {user?.email ?? '—'}
+              {accountIdentifierLabel}
             </Text>
             <label style={{ display: 'block', marginTop: 8, marginBottom: 6, fontWeight: 600 }} htmlFor="displayName">
               Tên hiển thị
@@ -247,6 +280,34 @@ export function M08() {
               value={displayName}
               maxLength={100}
               onChange={(e) => setDisplayName(e.target.value)}
+            />
+            <label style={{ display: 'block', marginTop: 12, marginBottom: 6, fontWeight: 600 }} htmlFor="accountPhone">
+              Số điện thoại
+            </label>
+            <input
+              id="accountPhone"
+              className="input"
+              type="tel"
+              value={phone}
+              maxLength={20}
+              autoComplete="tel"
+              placeholder="0912345678"
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            <Text muted style={{ marginTop: 4 }}>
+              Dùng để người thân liên hệ; để trống nếu không muốn khai.
+            </Text>
+            <label style={{ display: 'block', marginTop: 12, marginBottom: 6, fontWeight: 600 }} htmlFor="accountAddress">
+              Địa chỉ
+            </label>
+            <input
+              id="accountAddress"
+              className="input"
+              value={address}
+              maxLength={200}
+              autoComplete="street-address"
+              placeholder="12 Lê Lợi, Q.1, TP.HCM"
+              onChange={(e) => setAddress(e.target.value)}
             />
             <label style={{ display: 'block', marginTop: 12, marginBottom: 6, fontWeight: 600 }} htmlFor="timezone">
               Múi giờ

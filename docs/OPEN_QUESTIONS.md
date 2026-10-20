@@ -12,6 +12,7 @@ Mọi mục dưới đây cần người dùng trả lời trước (hoặc tron
 | Q6 | Múi giờ hiển thị mặc định: Asia/Ho_Chi_Minh có đúng cho mọi người dùng không? | DATABASE_PLAN, backend | Đúng, cho phép người dùng đổi ở M08 | Chờ duyệt |
 | Q7 | Người thân chỉ có quyền “xem lịch” ở MVP; quyền “thiết lập thuốc” nằm ở giai đoạn mở rộng — xác nhận phân tầng. | BUILD_ROADMAP, M07 | Đúng như phân tầng đã viết | Chờ duyệt |
 | Q8 | Mã mời kết nối người thân: dùng số 6 chữ số dễ đọc cho người cao tuổi (thay vì mã dài) — có chấp nhận đánh đổi bảo mật nhẹ không? | M07, backend | Mã 6 chữ số, có hạn 15 phút, mỗi lần tạo thì mã cũ vô hiệu | Chờ duyệt |
+| Q11 | Đăng nhập bằng SĐT không dùng OTP (Spark plan không hỗ trợ Phone Auth) mà qua **email nội bộ `<sđt>@med.local`** — chấp nhận đánh đổi: SĐT không được xác thực thật, quên mật khẩu phải liên hệ admin? | Xác thực, M08 | Dùng email nội bộ; SĐT/địa chỉ lưu vào hồ sơ (`users.phone`/`users.address`) | **Đã chốt 20/10/2026** (người dùng chọn) |
 
 ## Các câu hỏi đã đóng
 

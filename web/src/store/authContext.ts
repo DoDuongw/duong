@@ -13,11 +13,19 @@ export interface AuthContextValue {
   profile: UserProfile | null;
   /** Múi giờ người dùng (users.timezone) — mặc định Asia/Ho_Chi_Minh khi chưa có profile */
   timezone: string;
+  /** SĐT của tài khoản (users.phone) — null nếu chưa khai */
+  phone: string | null;
   /** false = chưa điền cấu hình Firebase → hiện hướng dẫn thay vì ô đăng nhập */
   configured: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  /** `identifier` = email hoặc số điện thoại (SĐT đi qua email nội bộ — xem utils/phone.ts) */
+  login: (identifier: string, password: string) => Promise<void>;
+  /** `identifier` = email hoặc số điện thoại; SĐT/địa chỉ lưu vào hồ sơ backend */
+  register: (
+    identifier: string,
+    password: string,
+    profile?: { phone?: string; address?: string; displayName?: string },
+  ) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
   /** Tải lại hồ sơ backend (sau khi PATCH /users/me ở M08) */
