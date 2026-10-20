@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*
+!.env.example
+*.log
+web/dist/
+coverage/
+
+# Firebase service account — TUYỆT ĐỐI không commit
+*serviceAccountKey*.json
+*firebase-adminsdk*.json
+*service-account*.json
