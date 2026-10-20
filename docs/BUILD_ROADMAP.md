@@ -137,6 +137,15 @@ Thứ tự: **M04 → M05 → M03 → M01 → M02 → M06**. Mỗi màn hình: n
 - Danh sách giới hạn đã biết (độ tin cậy Web Push, iOS cần PWA để nhận push).
 - Rà soát mã không để lộ bí mật; kiểm tra theo README trên thư mục sạch.
 
+**Trạng thái — ✅ HOÀN THÀNH 20/10/2026**:
+- **Git đã có trên máy** (Git 2.55.0 cài qua winget) — repo khởi tạo tại gốc, nhánh `main` chứa trạng thái GĐ0–7, công việc GĐ8 trên nhánh `build/phase-8-hoan-thien-ban-giao`. Quy tắc nhánh/commit của PLAN từ nay áp dụng được.
+- **`.env.example`**: bổ sung `RELATIVE_ALERT_AFTER_MINUTES` (trước đây chỉ có trong `.env` thật); rà soát cả backend và web — chỉ chứa giá trị mẫu, không có bí mật.
+- **Quét bí mật**: `git grep` tìm API key (`AIza…`), khối private key (`BEGIN PRIVATE KEY`), email service account (`firebase-adminsdk-…`) trong mã đã commit → **không có kết quả thật**, chỉ có tên biến.
+- **README cập nhật**: số test đúng (backend 105, web 126), màn hình đã nối API thật (thay ghi chú “khung”), Web Push đã cài (GĐ5), Git đã có, bổ sung mục giới hạn đã biết (45/47 TEST_PLAN đạt) + mục Git.
+- **Kiểm thử**: chạy lại toàn bộ sau khi sửa — backend **105/105**, web **126/126**, `tsc`/lint sạch, web build production OK (472,12 kB / gzip 143,29 kB).
+
+**Còn lại sau bàn giao (không thuộc phạm vi tự động hoá)**: 2 kịch bản push cần thiết bị/tài khoản thật (**N7** iOS, **N12** người thân); xoay/xóa khóa service account cũ trên Firebase Console nếu nghi ngờ lộ.
+
 ## Phụ thuộc giữa các giai đoạn
 
 | Giai đoạn | Phụ thuộc | Song song |
