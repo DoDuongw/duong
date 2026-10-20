@@ -21,6 +21,8 @@ export interface UserProfile {
   id: string;
   phone: string | null;
   displayName: string | null;
+  /** Thông tin hồ sơ (M08) — địa chỉ liên hệ, có thể null */
+  address: string | null;
   timezone: string;
   preferences: UserPreferences | null;
 }

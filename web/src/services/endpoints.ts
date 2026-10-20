@@ -41,12 +41,22 @@ export function getProfile(): Promise<UserProfile> {
   return apiFetch<UserProfile>('/users/me');
 }
 
-export function syncProfile(input?: { displayName?: string; timezone?: string }): Promise<UserProfile> {
+export function syncProfile(input?: {
+  displayName?: string;
+  phone?: string;
+  address?: string;
+  timezone?: string;
+}): Promise<UserProfile> {
   return apiFetch<UserProfile>('/users/me/sync', { method: 'POST', body: input ?? {} });
 }
 
-/** PATCH /users/me — đổi tên hiển thị / múi giờ (M08) */
-export function updateProfile(input: { displayName?: string; timezone?: string }): Promise<UserProfile> {
+/** PATCH /users/me — đổi tên hiển thị / SĐT / địa chỉ / múi giờ (M08) */
+export function updateProfile(input: {
+  displayName?: string;
+  phone?: string | null;
+  address?: string | null;
+  timezone?: string;
+}): Promise<UserProfile> {
   return apiFetch<UserProfile>('/users/me', { method: 'PATCH', body: input });
 }
 

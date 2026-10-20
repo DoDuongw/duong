@@ -23,6 +23,7 @@ const authValue: AuthContextValue = {
   user: { uid: 'u1', email: 'lan@example.com' },
   profile: null,
   timezone: 'Asia/Ho_Chi_Minh',
+  phone: null,
   configured: true,
   error: null,
   login: vi.fn(),

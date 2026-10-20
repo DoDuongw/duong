@@ -6,6 +6,7 @@ import { TextField } from '../components/Fields';
 import { Segmented } from '../components/Segmented';
 import { Text } from '../components/Text';
 import { useAuth } from '../store/authContext';
+import { isValidAddress, isValidPhone, looksLikePhone } from '../utils/phone';
 
 /** Nội dung giới thiệu — công dụng, tiện ích và lợi ích của ứng dụng. */
 const FEATURES = [
@@ -49,7 +50,7 @@ const BENEFITS = [
 ];
 
 const STEPS = [
-  { icon: '1️⃣', title: 'Tạo tài khoản', body: 'Chỉ cần email và mật khẩu. Không cần số điện thoại.' },
+  { icon: '1️⃣', title: 'Tạo tài khoản', body: 'Dùng email hoặc số điện thoại. Có thể khai thêm số điện thoại và địa chỉ để tiện liên hệ.' },
   { icon: '2️⃣', title: 'Thêm thuốc và giờ uống', body: 'Ghi tên thuốc, liều và các giờ uống trong ngày.' },
   { icon: '3️⃣', title: 'Bật thông báo', body: 'Cho phép trình duyệt gửi thông báo để không bỏ lỡ liều nào.' },
 ];
@@ -64,46 +65,93 @@ type AuthMode = 'login' | 'register';
  * công dụng – tiện ích – lợi ích; khi người dùng bấm “Đăng nhập” hoặc
  * “Đăng ký”, form đăng nhập/đăng ký hiện ra **giữa màn hình** dưới
  * dạng hộp thoại (dialog).
+ *
+ * Đăng nhập dùng **một ô nhập chung**: gõ email thì đăng nhập bằng email,
+ * gõ số điện thoại thì đăng nhập bằng SĐT (SĐT đi qua email nội bộ
+ * `<sđt>@med.local` vì Firebase Spark plan không có Phone Auth OTP SMS).
  */
 export function Login() {
   const { configured, error, login, register, clearError } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<AuthMode>('login');
   const [authOpen, setAuthOpen] = useState(false);
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [fieldError, setFieldError] = useState<{
+    identifier?: string;
+    password?: string;
+    phone?: string;
+    address?: string;
+  }>({});
   const [submitting, setSubmitting] = useState(false);
 
   /** Mở hộp thoại đăng nhập/đăng ký ở giữa màn hình. */
   function openAuth(next: AuthMode) {
     setMode(next);
     clearError();
+    setFieldError({});
     setAuthOpen(true);
   }
 
   function closeAuth() {
     setAuthOpen(false);
     clearError();
+    setFieldError({});
   }
 
   function switchMode(next: AuthMode) {
     setMode(next);
     clearError();
+    setFieldError({});
+  }
+
+  /** Kiểm tra đầu vào theo chế độ đang chọn — dùng chung cho cả hai chế độ */
+  function validateFields(): { identifier?: string; password?: string; phone?: string; address?: string } {
+    const errors: { identifier?: string; password?: string; phone?: string; address?: string } = {};
+    const value = identifier.trim();
+
+    if (value === '') {
+      errors.identifier = mode === 'login' ? 'Nhập email hoặc số điện thoại' : 'Nhập email hoặc số điện thoại';
+    } else if (looksLikePhone(value)) {
+      if (!isValidPhone(value)) errors.identifier = 'Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678)';
+    } else if (!/^\S+@\S+\.\S+$/.test(value)) {
+      errors.identifier = 'Email không hợp lệ';
+    }
+
+    if (password.length < 6) errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+
+    // Chỉ đăng ký mới có SĐT/địa chỉ — không bắt buộc, nhưng nhập thì phải đúng
+    if (mode === 'register') {
+      if (phone.trim() !== '' && !isValidPhone(phone)) {
+        errors.phone = 'Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678)';
+      }
+      if (address.trim() !== '' && !isValidAddress(address)) {
+        errors.address = 'Địa chỉ tối đa 200 ký tự';
+      }
+    }
+
+    return errors;
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const errors: { email?: string; password?: string } = {};
-    if (!/^\S+@\S+\.\S+$/.test(email)) errors.email = 'Email không hợp lệ';
-    if (password.length < 6) errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    const errors = validateFields();
     setFieldError(errors);
     if (Object.keys(errors).length > 0) return;
 
     setSubmitting(true);
     try {
-      if (mode === 'login') await login(email.trim(), password);
-      else await register(email.trim(), password);
+      const value = identifier.trim();
+      if (mode === 'login') {
+        await login(value, password);
+      } else {
+        await register(value, password, {
+          phone: phone.trim() === '' ? undefined : phone.trim(),
+          address: address.trim() === '' ? undefined : address.trim(),
+        });
+      }
       navigate('/', { replace: true });
     } catch {
       // lỗi đã lưu trong auth context → hiển thị ở dưới form
@@ -290,17 +338,24 @@ export function Login() {
 
                 <form onSubmit={handleSubmit} noValidate>
                   <TextField
-                    id="auth-email"
-                    label="Email"
-                    type="email"
-                    value={email}
+                    id="auth-identifier"
+                    label="Email hoặc số điện thoại"
+                    type="text"
+                    value={identifier}
                     onChange={(v) => {
-                      setEmail(v);
+                      setIdentifier(v);
                       clearError();
                     }}
-                    error={fieldError.email}
-                    autoComplete="email"
-                    placeholder="ten@vi-du.com"
+                    error={fieldError.identifier}
+                    hint={
+                      mode === 'login'
+                        ? looksLikePhone(identifier)
+                          ? 'Đăng nhập bằng số điện thoại'
+                          : 'Nhập email hoặc số điện thoại đều được'
+                        : 'Dùng để đăng nhập về sau (email hoặc số điện thoại)'
+                    }
+                    autoComplete="username"
+                    placeholder="ten@vi-du.com hoặc 0912345678"
                     required
                   />
                   <TextField
@@ -317,6 +372,38 @@ export function Login() {
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     required
                   />
+                  {mode === 'register' && (
+                    <>
+                      <TextField
+                        id="auth-phone"
+                        label="Số điện thoại (không bắt buộc)"
+                        type="tel"
+                        value={phone}
+                        onChange={(v) => {
+                          setPhone(v);
+                          clearError();
+                        }}
+                        error={fieldError.phone}
+                        hint="Dùng để người thân liên hệ và hiện trong kết nối gia đình"
+                        autoComplete="tel"
+                        placeholder="0912345678"
+                      />
+                      <TextField
+                        id="auth-address"
+                        label="Địa chỉ (không bắt buộc)"
+                        type="text"
+                        value={address}
+                        onChange={(v) => {
+                          setAddress(v);
+                          clearError();
+                        }}
+                        error={fieldError.address}
+                        hint="Địa chỉ liên hệ, lưu trong hồ sơ của bạn"
+                        autoComplete="street-address"
+                        placeholder="12 Lê Lợi, Q.1, TP.HCM"
+                      />
+                    </>
+                  )}
                   {error && (
                     <Notice tone="error" icon={false}>
                       {error}

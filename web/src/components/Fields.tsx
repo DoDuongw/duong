@@ -142,7 +142,7 @@ export function TextField({
   id,
 }: {
   label: string;
-  type?: 'text' | 'email' | 'password';
+  type?: 'text' | 'email' | 'password' | 'tel';
   value: string;
   onChange: (value: string) => void;
   error?: string | null;

@@ -41,10 +41,12 @@ function makeAuth(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
       id: 'p1',
       phone: null,
       displayName: 'Bà Lan',
+      address: null,
       timezone: 'Asia/Ho_Chi_Minh',
       preferences: null,
     },
     timezone: 'Asia/Ho_Chi_Minh',
+    phone: null,
     configured: true,
     error: null,
     login: vi.fn(),
@@ -87,6 +89,7 @@ describe('M08 — tài khoản', () => {
       id: 'p1',
       phone: null,
       displayName: 'Bà Lan mới',
+      address: null,
       timezone: 'Asia/Tokyo',
       preferences: null,
     });
@@ -100,7 +103,12 @@ describe('M08 — tài khoản', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lưu thông tin' }));
 
     await waitFor(() =>
-      expect(updateProfile).toHaveBeenCalledWith({ displayName: 'Bà Lan mới', timezone: 'Asia/Tokyo' }),
+      expect(updateProfile).toHaveBeenCalledWith({
+        displayName: 'Bà Lan mới',
+        phone: null,
+        address: null,
+        timezone: 'Asia/Tokyo',
+      }),
     );
     expect(auth.refreshProfile).toHaveBeenCalled();
     expect(await screen.findByText('Đã lưu thông tin cá nhân.')).toBeInTheDocument();
