@@ -425,13 +425,13 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 - `src/scripts/grantAdmin.ts` + `npm run admin:grant -- <email hoặc SĐT>`: cấp admin đầu tiên (không có endpoint tự cấp).
 - `GET/PATCH /users/me` trả thêm `role`.
 
-**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại).
+**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); giao diện quản trị bố cục **hai cột trên màn hình lớn**, thanh tiêu đề có thời điểm cập nhật + **Tải lại**, 8 thẻ số liệu có nhãn ngữ cảnh, tìm kiếm + **Xóa lọc**, thẻ người dùng có avatar/badge trạng thái, lỗi push + nhật ký dạng timeline; types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại).
 
 **Kết quả chạy lệnh (đã chạy thật)**:
 - Backend: `npm run lint` (`tsc --noEmit`) sạch; `npm test` **146/146** (9 suite; **+24 test**: 18 `tests/admin.test.ts` + 6 middleware R10–R15).
-- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **160/160** (18 file; **+11**: 8 admin + 3 lối tắt quản trị); `npm run build` OK (**489,03 kB / gzip 147,05 kB**; CSS 17,69 kB / gzip 3,73 kB).
+- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **161/161** (18 file; **+12**: 8 admin + 3 lối tắt + 1 tải lại); `npm run build` OK (**492,72 kB / gzip 147,69 kB**; CSS 24,32 kB / gzip 4,82 kB).
 
-**Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công.
+**Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công, nút **Tải lại** gọi lại cả 4 API.
 
 **CHƯA KIỂM THỬ (ghi rõ, không đánh dấu đạt)**:
 1. **Chưa mở `/admin` trên trình duyệt thật**; chưa chạy **A8–A14** dưới đây.
@@ -446,7 +446,7 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 |---|---|---|
 | A8 | Trong `backend/`, chạy `npm run admin:grant -- <email hoặc SĐT của bạn>` | In “Đã cấp quyền admin…”; tải lại web thấy nút “Quản trị hệ thống” ở đầu trang (không cần vào M08) |
 | A9 | Đăng nhập tài khoản **thường**, mở thẳng `/admin` | Thấy “Tài khoản của bạn không có quyền truy cập…”, không có số liệu; API admin trả 403 |
-| A10 | Admin mở `/admin` | Thấy 8 thẻ số liệu, danh sách người dùng, mục lỗi push, nhật ký; **không** thấy tên thuốc/lý do không uống |
+| A10 | Admin mở `/admin` | Thấy 8 thẻ số liệu, bố cục hai cột trên màn hình lớn (xếp dọc trên điện thoại), danh sách người dùng, mục lỗi push, nhật ký; nút “Tải lại” cập nhật lại dữ liệu; **không** thấy tên thuốc/lý do không uống |
 | A11 | Tìm theo tên và SĐT; bấm trang sau | Kết quả lọc đúng; phân trang đúng, không tải lại toàn trang |
 | A12 | Khóa một tài khoản thử → mở cửa sổ ẩn danh đăng nhập tài khoản đó | Đăng nhập bị chặn (Firebase disabled); token cũ gọi API nhận 403 “Tài khoản đã bị khóa…” |
 | A13 | Mở khóa → đăng nhập lại | Vào được bình thường; badge “Đã khóa” biến mất; nhật ký có `admin_lock` + `admin_unlock` |

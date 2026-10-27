@@ -50,8 +50,25 @@ function formatDateTime(iso: string): string {
   return date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
 function displayName(user: Pick<AdminUserItem, 'displayName' | 'phone' | 'id'>): string {
   return user.displayName?.trim() || user.phone || `Người dùng ${user.id.slice(-6)}`;
+}
+
+function initials(user: AdminUserItem): string {
+  const name = user.displayName?.trim();
+  if (name) {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(-2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('');
+  }
+  return user.phone?.slice(-2) ?? '?';
 }
 
 function errorMessage(err: unknown): string {
@@ -77,6 +94,8 @@ export function Admin() {
   const [notifications, setNotifications] = useState<AdminFailedNotification[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminAuditItem[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -110,22 +129,34 @@ export function Admin() {
     }
   }, []);
 
+  const loadAll = useCallback(async () => {
+    await Promise.all([
+      loadSummary(),
+      loadUsers(q, page),
+      getAdminNotifications(20)
+        .then(setNotifications)
+        .catch((err) => setError(errorMessage(err))),
+      getAdminAuditLogs(20)
+        .then(setAuditLogs)
+        .catch((err) => setError(errorMessage(err))),
+    ]);
+    setLastUpdated(new Date());
+  }, [loadSummary, loadUsers, q, page]);
+
   useEffect(() => {
     if (!isAdmin) return;
     // oxlint-disable-next-line react/set-state-in-effect -- tải dữ liệu quản trị khi mở trang
-    void loadSummary();
-    void loadUsers(q, page);
-    void getAdminNotifications(20)
-      .then(setNotifications)
-      .catch((err) => setError(errorMessage(err)));
-    void getAdminAuditLogs(20)
-      .then(setAuditLogs)
-      .catch((err) => setError(errorMessage(err)));
-  }, [isAdmin, loadSummary, loadUsers, q, page]);
+    void loadAll();
+  }, [isAdmin, loadAll]);
 
   const refresh = useCallback(async () => {
-    await Promise.all([loadSummary(), loadUsers(q, page)]);
-  }, [loadSummary, loadUsers, q, page]);
+    setRefreshing(true);
+    try {
+      await loadAll();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadAll]);
 
   function submitSearch(event: React.FormEvent) {
     event.preventDefault();
@@ -133,6 +164,12 @@ export function Admin() {
     setError(null);
     setPage(1);
     setQ(searchInput.trim());
+  }
+
+  function clearSearch() {
+    setSearchInput('');
+    setQ('');
+    setPage(1);
   }
 
   async function confirmLock() {
@@ -197,18 +234,25 @@ export function Admin() {
 
   if (!profile) {
     return (
-      <main className="page page--task">
-        <p role="status">Đang tải hồ sơ…</p>
+      <main className="page page--task admin-page">
+        <p className="admin-loading" role="status">
+          <span className="spinner" aria-hidden="true" /> Đang tải hồ sơ…
+        </p>
       </main>
     );
   }
 
   if (!isAdmin) {
     return (
-      <main className="page page--task">
-        <h1>Quản trị hệ thống</h1>
-        <Notice tone="error">Tài khoản của bạn không có quyền truy cập khu vực này.</Notice>
-        <Link to="/">← Về trang chủ</Link>
+      <main className="page page--task admin-page">
+        <div className="admin-denied">
+          <p className="admin-eyebrow">Quyền truy cập</p>
+          <h1>Quản trị hệ thống</h1>
+          <Notice tone="error">Tài khoản của bạn không có quyền truy cập khu vực này.</Notice>
+          <Link to="/" className="admin-back">
+            ← Về trang chủ
+          </Link>
+        </div>
       </main>
     );
   }
@@ -219,16 +263,25 @@ export function Admin() {
   return (
     <main className="page page--task admin-page">
       <header className="admin-head">
-        <div>
+        <div className="admin-head__main">
           <p className="admin-eyebrow">Khu vực vận hành</p>
           <h1>Quản trị hệ thống</h1>
-          <p className="muted admin-head__desc">
+          <p className="admin-head__desc">
             Theo dõi hoạt động, khóa tài khoản và đặt lại mật khẩu. Không hiển thị nội dung y tế chi tiết.
           </p>
         </div>
-        <Link to="/" className="admin-back">
-          ← Về ứng dụng
-        </Link>
+        <div className="admin-head__actions">
+          <span className="admin-updated">
+            <span className="admin-live" aria-hidden="true" />
+            {lastUpdated ? `Cập nhật ${formatTime(lastUpdated)}` : 'Đang cập nhật…'}
+          </span>
+          <Button variant="ghost" loading={refreshing} onClick={() => void refresh()}>
+            Tải lại
+          </Button>
+          <Link to="/" className="admin-back">
+            ← Về ứng dụng
+          </Link>
+        </div>
       </header>
 
       {error && (
@@ -242,206 +295,262 @@ export function Admin() {
         </Notice>
       )}
 
-      <Section title="Tổng quan 24 giờ qua" icon="📊" description="Số liệu vận hành, không gồm tên thuốc hay ghi chú y tế.">
+      <section className="admin-overview" aria-labelledby="admin-overview-title">
+        <div className="admin-overview__head">
+          <div>
+            <p className="admin-kicker">Tổng quan vận hành</p>
+            <h2 id="admin-overview-title">24 giờ qua</h2>
+          </div>
+          <span className="admin-overview__note">Số liệu tổng hợp · Không có nội dung y tế chi tiết</span>
+        </div>
+
         {summary ? (
-          <div className="stat-grid">
-            <div className="stat">
-              <span className="stat__value">{summary.users}</span>
-              <span className="stat__label">Người dùng</span>
+          <div className="admin-stats">
+            <div className="admin-stat admin-stat--primary">
+              <span className="admin-stat__label">Người dùng</span>
+              <strong className="admin-stat__value">{summary.users}</strong>
+              <span className="admin-stat__hint">Tài khoản đã đăng ký</span>
             </div>
-            <div className="stat">
-              <span className="stat__value">{summary.disabledUsers}</span>
-              <span className="stat__label">Tài khoản bị khóa</span>
+            <div className="admin-stat admin-stat--danger">
+              <span className="admin-stat__label">Tài khoản bị khóa</span>
+              <strong className="admin-stat__value">{summary.disabledUsers}</strong>
+              <span className="admin-stat__hint">Cần hỗ trợ mở khóa</span>
             </div>
-            <div className="stat">
-              <span className="stat__value">{summary.activeMedications}</span>
-              <span className="stat__label">Thuốc đang dùng</span>
+            <div className="admin-stat admin-stat--primary">
+              <span className="admin-stat__label">Thuốc đang dùng</span>
+              <strong className="admin-stat__value">{summary.activeMedications}</strong>
+              <span className="admin-stat__hint">Đang hoạt động</span>
             </div>
-            <div className="stat">
-              <span className="stat__value">{summary.doses24h}</span>
-              <span className="stat__label">Liều trong 24 giờ</span>
+            <div className="admin-stat admin-stat--neutral">
+              <span className="admin-stat__label">Liều trong 24 giờ</span>
+              <strong className="admin-stat__value">{summary.doses24h}</strong>
+              <span className="admin-stat__hint">{summary.confirmed24h} đã xác nhận</span>
             </div>
-            <div className="stat">
-              <span className="stat__value">{remainingUnconfirmed}</span>
-              <span className="stat__label">Chưa/không xác nhận</span>
+            <div className="admin-stat admin-stat--warning">
+              <span className="admin-stat__label">Chưa/không xác nhận</span>
+              <strong className="admin-stat__value">{remainingUnconfirmed}</strong>
+              <span className="admin-stat__hint">Cần theo dõi</span>
             </div>
-            <div className="stat">
-              <span className="stat__value">{summary.activeConnections}</span>
-              <span className="stat__label">Kết nối người thân</span>
+            <div className="admin-stat admin-stat--success">
+              <span className="admin-stat__label">Kết nối người thân</span>
+              <strong className="admin-stat__value">{summary.activeConnections}</strong>
+              <span className="admin-stat__hint">Đang hoạt động</span>
             </div>
-            <div className="stat">
-              <span className="stat__value">{summary.activeDevices}</span>
-              <span className="stat__label">Thiết bị nhận tin</span>
+            <div className="admin-stat admin-stat--success">
+              <span className="admin-stat__label">Thiết bị nhận tin</span>
+              <strong className="admin-stat__value">{summary.activeDevices}</strong>
+              <span className="admin-stat__hint">Đang bật thông báo</span>
             </div>
-            <div className="stat">
-              <span className="stat__value">{summary.failedNotifications24h}</span>
-              <span className="stat__label">Push lỗi</span>
+            <div className="admin-stat admin-stat--danger">
+              <span className="admin-stat__label">Push lỗi</span>
+              <strong className="admin-stat__value">{summary.failedNotifications24h}</strong>
+              <span className="admin-stat__hint">Kiểm tra token/cấu hình</span>
             </div>
           </div>
         ) : (
-          <p role="status">Đang tải số liệu…</p>
+          <p className="admin-loading" role="status">
+            <span className="spinner" aria-hidden="true" /> Đang tải số liệu…
+          </p>
         )}
-      </Section>
+      </section>
 
-      <Section
-        title="Người dùng"
-        icon="👥"
-        description="Tìm theo tên hoặc số điện thoại. Chỉ số đếm — không có nội dung y tế."
-      >
-        <form className="admin-search" onSubmit={submitSearch} role="search">
-          <label className="admin-search__label" htmlFor="admin-search-input">
-            Tìm người dùng
-          </label>
-          <div className="admin-search__row">
-            <input
-              id="admin-search-input"
-              className="input"
-              type="search"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Ví dụ: Bà Lan hoặc 0912345678"
-            />
-            <Button type="submit" variant="secondary">
-              Tìm
-            </Button>
-          </div>
-        </form>
+      <div className="admin-dashboard">
+        <div className="admin-dashboard__main">
+          <Section
+            title="Người dùng"
+            description="Tìm theo tên hoặc số điện thoại. Chỉ số đếm — không có nội dung y tế."
+          >
+            <form className="admin-search" onSubmit={submitSearch} role="search">
+              <label className="admin-search__label" htmlFor="admin-search-input">
+                Tìm người dùng
+              </label>
+              <div className="admin-search__row">
+                <input
+                  id="admin-search-input"
+                  className="input"
+                  type="search"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Ví dụ: Bà Lan hoặc 0912345678"
+                />
+                <Button type="submit" variant="secondary">
+                  Tìm
+                </Button>
+                {q && (
+                  <button type="button" className="admin-search__clear" onClick={clearSearch}>
+                    Xóa lọc
+                  </button>
+                )}
+              </div>
+            </form>
 
-        {loadingUsers && <p role="status">Đang tải danh sách…</p>}
+            {loadingUsers && (
+              <p className="admin-list-status" role="status">
+                <span className="spinner" aria-hidden="true" /> Đang tải danh sách…
+              </p>
+            )}
 
-        {!loadingUsers && users && users.items.length === 0 && (
-          <p className="muted">Không tìm thấy người dùng phù hợp.</p>
-        )}
+            {!loadingUsers && users && users.items.length === 0 && (
+              <div className="admin-empty">
+                <strong>Không tìm thấy người dùng phù hợp.</strong>
+                <span>Thử tên khác hoặc số điện thoại đầy đủ.</span>
+              </div>
+            )}
 
-        {!loadingUsers && users && users.items.length > 0 && (
-          <>
-            <ul className="admin-users">
-              {users.items.map((user) => (
-                <li key={user.id} className={`admin-user${user.disabled ? ' admin-user--locked' : ''}`}>
-                  <div className="admin-user__head">
-                    <div>
-                      <h3 className="admin-user__name">{displayName(user)}</h3>
-                      <p className="admin-user__contact">
-                        {user.phone ?? 'Chưa có SĐT'} · {user.email ?? 'Chưa có email'}
-                      </p>
+            {!loadingUsers && users && users.items.length > 0 && (
+              <>
+                <ul className="admin-users">
+                  {users.items.map((user) => (
+                    <li key={user.id} className={`admin-user${user.disabled ? ' admin-user--locked' : ''}`}>
+                      <div className="admin-user__head">
+                        <div className="admin-user__identity">
+                          <span className="admin-avatar" aria-hidden="true">
+                            {initials(user)}
+                          </span>
+                          <div>
+                            <h3 className="admin-user__name">{displayName(user)}</h3>
+                            <p className="admin-user__contact">
+                              {user.phone ?? 'Chưa có SĐT'} · {user.email ?? 'Chưa có email'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="admin-user__badges">
+                          {user.role === 'admin' && <span className="badge badge--admin">Quản trị</span>}
+                          {user.disabled ? (
+                            <span className="badge badge--locked">Đã khóa</span>
+                          ) : (
+                            <span className="badge badge--active">Đang hoạt động</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <dl className="admin-metrics">
+                        <div>
+                          <dt>Thuốc đang dùng</dt>
+                          <dd>{user.medicationsActive}</dd>
+                        </div>
+                        <div>
+                          <dt>Liều 7 ngày</dt>
+                          <dd>{user.doses7d}</dd>
+                        </div>
+                        <div>
+                          <dt>Đã xác nhận</dt>
+                          <dd>{user.confirmed7d}</dd>
+                        </div>
+                        <div>
+                          <dt>Thiết bị</dt>
+                          <dd>{user.devicesActive}</dd>
+                        </div>
+                      </dl>
+
+                      <div className="admin-user__footer">
+                        <p className="admin-user__meta">
+                          Tạo ngày {formatDateTime(user.createdAt)} · Múi giờ {user.timezone}
+                        </p>
+
+                        <div className="admin-user__actions">
+                          <Button
+                            variant={user.disabled ? 'secondary' : 'danger'}
+                            onClick={() => setLockTarget(user)}
+                            aria-label={`${user.disabled ? 'Mở khóa' : 'Khóa'} tài khoản ${displayName(user)}`}
+                          >
+                            {user.disabled ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => openReset(user)}
+                            aria-label={`Đặt lại mật khẩu cho ${displayName(user)}`}
+                          >
+                            Đặt lại mật khẩu
+                          </Button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <nav className="admin-pager" aria-label="Phân trang người dùng">
+                  <button
+                    type="button"
+                    className="admin-pager__btn"
+                    disabled={page <= 1}
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  >
+                    ← Trang trước
+                  </button>
+                  <span className="admin-pager__info">
+                    Trang {users.page}/{totalPages} · {users.total} người dùng
+                  </span>
+                  <button
+                    type="button"
+                    className="admin-pager__btn"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((current) => current + 1)}
+                  >
+                    Trang sau →
+                  </button>
+                </nav>
+              </>
+            )}
+          </Section>
+        </div>
+
+        <aside className="admin-dashboard__side">
+          <Section
+            title="Lỗi gửi thông báo"
+            description="Các lần gửi Web Push thất bại gần đây — giúp phát hiện token hết hiệu lực hoặc cấu hình sai."
+          >
+            {notifications.length === 0 ? (
+              <div className="admin-empty">
+                <strong>Không có lỗi gửi thông báo.</strong>
+                <span>Hệ thống đang gửi thông báo bình thường.</span>
+              </div>
+            ) : (
+              <ul className="admin-log">
+                {notifications.map((item) => (
+                  <li key={item.id} className="admin-log__row admin-log__row--error">
+                    <div className="admin-log__head">
+                      <strong>{KIND_LABEL[item.kind] ?? item.kind}</strong>
+                      <time className="admin-log__time" dateTime={item.sentAt}>
+                        {formatDateTime(item.sentAt)}
+                      </time>
                     </div>
-                    <div className="admin-user__badges">
-                      {user.role === 'admin' && <span className="badge badge--admin">Quản trị</span>}
-                      {user.disabled && <span className="badge badge--locked">Đã khóa</span>}
+                    <p className="admin-log__error">{item.error ?? 'Không rõ lỗi'}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          <Section
+            title="Nhật ký thao tác"
+            description="Thao tác gần đây, gần nhất trước. Tên hiển thị là tài khoản bị tác động."
+          >
+            {auditLogs.length === 0 ? (
+              <div className="admin-empty">
+                <strong>Chưa có thao tác nào.</strong>
+                <span>Nhật ký sẽ xuất hiện khi có thay đổi tài khoản.</span>
+              </div>
+            ) : (
+              <ul className="admin-log">
+                {auditLogs.map((item) => (
+                  <li key={item.id} className="admin-log__row admin-log__row--audit">
+                    <div className="admin-log__head">
+                      <strong>{ACTION_LABEL[item.action] ?? item.action}</strong>
+                      <time className="admin-log__time" dateTime={item.createdAt}>
+                        {formatDateTime(item.createdAt)}
+                      </time>
                     </div>
-                  </div>
-
-                  <dl className="admin-metrics">
-                    <div>
-                      <dt>Thuốc đang dùng</dt>
-                      <dd>{user.medicationsActive}</dd>
-                    </div>
-                    <div>
-                      <dt>Liều 7 ngày</dt>
-                      <dd>{user.doses7d}</dd>
-                    </div>
-                    <div>
-                      <dt>Đã xác nhận</dt>
-                      <dd>{user.confirmed7d}</dd>
-                    </div>
-                    <div>
-                      <dt>Thiết bị</dt>
-                      <dd>{user.devicesActive}</dd>
-                    </div>
-                  </dl>
-
-                  <p className="admin-user__meta">
-                    Tạo ngày {formatDateTime(user.createdAt)} · Múi giờ {user.timezone}
-                  </p>
-
-                  <div className="admin-user__actions">
-                    <Button
-                      variant={user.disabled ? 'secondary' : 'danger'}
-                      onClick={() => setLockTarget(user)}
-                      aria-label={`${user.disabled ? 'Mở khóa' : 'Khóa'} tài khoản ${displayName(user)}`}
-                    >
-                      {user.disabled ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => openReset(user)}
-                      aria-label={`Đặt lại mật khẩu cho ${displayName(user)}`}
-                    >
-                      Đặt lại mật khẩu
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <nav className="admin-pager" aria-label="Phân trang người dùng">
-              <Button
-                variant="ghost"
-                disabled={page <= 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-              >
-                ← Trang trước
-              </Button>
-              <span className="admin-pager__info">
-                Trang {users.page}/{totalPages} · {users.total} người dùng
-              </span>
-              <Button
-                variant="ghost"
-                disabled={page >= totalPages}
-                onClick={() => setPage((current) => current + 1)}
-              >
-                Trang sau →
-              </Button>
-            </nav>
-          </>
-        )}
-      </Section>
-
-      <Section
-        title="Lỗi gửi thông báo"
-        icon="🔔"
-        description="Các lần gửi Web Push thất bại gần đây — giúp phát hiện token hết hiệu lực hoặc cấu hình sai."
-      >
-        {notifications.length === 0 ? (
-          <p className="muted">Không có lỗi gửi thông báo.</p>
-        ) : (
-          <ul className="admin-log">
-            {notifications.map((item) => (
-              <li key={item.id} className="admin-log__row">
-                <div>
-                  <strong>{KIND_LABEL[item.kind] ?? item.kind}</strong>
-                  <span className="admin-log__time">{formatDateTime(item.sentAt)}</span>
-                </div>
-                <p className="admin-log__error">{item.error ?? 'Không rõ lỗi'}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section
-        title="Nhật ký thao tác"
-        icon="📝"
-        description="Thao tác gần đây, gần nhất trước. Tên hiển thị là tài khoản bị tác động."
-      >
-        {auditLogs.length === 0 ? (
-          <p className="muted">Chưa có thao tác nào.</p>
-        ) : (
-          <ul className="admin-log">
-            {auditLogs.map((item) => (
-              <li key={item.id} className="admin-log__row">
-                <div>
-                  <strong>{ACTION_LABEL[item.action] ?? item.action}</strong>
-                  <span className="admin-log__time">{formatDateTime(item.createdAt)}</span>
-                </div>
-                <p className="admin-log__actor">
-                  Đối tượng: {item.actorName ?? item.actorPhone ?? 'Không rõ'} · {item.entity}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
+                    <p className="admin-log__actor">
+                      Đối tượng: {item.actorName ?? item.actorPhone ?? 'Không rõ'} · {item.entity}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </aside>
+      </div>
 
       {lockTarget && (
         <div className="modal-backdrop" onClick={() => !busy && setLockTarget(null)}>

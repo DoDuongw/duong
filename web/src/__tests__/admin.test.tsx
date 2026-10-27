@@ -163,6 +163,22 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
     await waitFor(() => expect(getAdminUsers).toHaveBeenLastCalledWith({ q: undefined, page: 2, pageSize: 10 }));
   });
 
+  it('nút Tải lại tải lại toàn bộ dữ liệu quản trị', async () => {
+    const user = userEvent.setup();
+    renderAdmin();
+    await screen.findByText('Bà Lan');
+    vi.clearAllMocks();
+
+    await user.click(screen.getByRole('button', { name: 'Tải lại' }));
+
+    await waitFor(() => {
+      expect(getAdminSummary).toHaveBeenCalled();
+      expect(getAdminUsers).toHaveBeenCalled();
+      expect(getAdminNotifications).toHaveBeenCalled();
+      expect(getAdminAuditLogs).toHaveBeenCalled();
+    });
+  });
+
   it('khóa tài khoản: xác nhận trong hộp thoại → gọi API disabled=true', async () => {
     const user = userEvent.setup();
     renderAdmin();
