@@ -41,6 +41,8 @@ erDiagram
         string display_name
         string timezone
         json preferences
+        enum role
+        datetime disabled_at
     }
     MEDICATIONS {
         bigint id PK
@@ -147,7 +149,11 @@ erDiagram
 | address | VARCHAR(200) | | Địa chỉ liên hệ trong hồ sơ (M08) — không bắt buộc |
 | timezone | VARCHAR(50) | default 'Asia/Ho_Chi_Minh' | Múi giờ hiển thị |
 | preferences | JSON | | Cỡ chữ, âm thanh, nhắc lại (M08). Hiện dùng: `snoozeMinutes` (5–30, mặc định 10), `snoozeMax` (1–5, mặc định 3) — backend tuân theo khi snooze |
+| role | ENUM('user','admin') | default 'user' | Vai trò hậu trường. `admin` mới được gọi `/api/v1/admin`; cấp bằng script `npm run admin:grant` (không có endpoint tự cấp) |
+| disabled_at | DATETIME | nullable, default null | `null` = đang hoạt động; có ngày = bị quản trị khóa. `authMiddleware` chặn mọi API bằng **403**; Firebase cũng đặt `disabled=true` để chặn đăng nhập lại |
 | created_at / updated_at | DATETIME | | UTC |
+
+> **Email không lưu trong MongoDB** (Firebase Auth giữ). Trang `/admin` lấy email của cả trang qua Firebase Admin `getUsers()` một lần; lỗi Firebase → `email = null`, không ảnh hưởng dữ liệu khác. Khóa/mở và đặt lại mật khẩu ghi `audit_logs` nhưng **không** ghi mật khẩu.
 
 ### 3.2 `medications` — thuốc
 
@@ -304,6 +310,7 @@ Phân biệt “đã gửi thông báo” với “người dùng đã xác nh�
 | 003 | dose_occurrences | 3 |
 | 004 | family_invites, family_connections | 5 |
 | 005 | notification_logs, audit_logs | 3–5 |
+| 006 | `users.role` + `users.disabled_at` (thêm trường, bản ghi cũ mặc định `user`/`null`) | 8 (quản trị) |
 
 ---
 
@@ -313,3 +320,4 @@ Phân biệt “đã gửi thông báo” với “người dùng đã xác nh�
 2. ENUM trạng thái lần uống: pending, confirmed, overdue, snoozed, missed, cannot_take.
 3. Chính sách lưu giữ ở mục 5 (phụ thuộc Q4).
 4. Mã mời lưu dạng băm SHA-256, không lưu mã thô.
+5. **Đã duyệt 20/10/2026**: thêm `users.role` + `users.disabled_at` cho khu vực quản trị; không thêm collection mới, không lưu email/mật khẩu trong MongoDB.

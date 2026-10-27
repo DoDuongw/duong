@@ -8,8 +8,8 @@
 
 ## 2. Phạm vi
 
-- **Trong phạm vi**: 8 màn hình M01–M08 (không thêm, xóa, đổi tên) trên website responsive; xác thực Firebase Email/Mật khẩu (Spark plan); thông báo Web Push (FCM for Web + Service Worker, PWA); backend Node.js/Express + MongoDB/Mongoose; kết nối người thân với phân quyền; theo dõi tuân thủ uống thuốc qua thống kê M01 và lịch sử M06.
-- **Ngoài phạm vi**: màn hình thứ chín; quản lý bệnh viện; tư vấn y tế bằng AI; chẩn đoán bệnh; chỉ định/liều lượng y tế; thêm vai trò ngoài “người cao tuổi (chủ hồ sơ)” và “người thân”.
+- **Trong phạm vi**: 8 màn hình M01–M08 (không thêm, xóa, đổi tên) trên website responsive; xác thực Firebase Email/Mật khẩu (Spark plan); thông báo Web Push (FCM for Web + Service Worker, PWA); backend Node.js/Express + MongoDB/Mongoose; kết nối người thân với phân quyền; theo dõi tuân thủ uống thuốc qua thống kê M01 và lịch sử M06; **khu vực quản trị hậu trường `/admin`** (ngoài M01–M08): thống kê chỉ đọc, khóa/mở tài khoản, đặt lại mật khẩu.
+- **Ngoài phạm vi**: màn hình thứ chín trong danh sách M01–M08; quản lý bệnh viện; tư vấn y tế bằng AI; chẩn đoán bệnh; chỉ định/liều lượng y tế; thêm vai trò **người dùng cuối** ngoài “người cao tuổi (chủ hồ sơ)” và “người thân” (quản trị viên là **vai trò hậu trường**, không phải màn hình mới); xóa tài khoản/dữ liệu (chờ Q4).
 
 ## 3. Công nghệ đã chốt
 
@@ -34,6 +34,7 @@
 | Thông báo | **Web Push (FCM for Web + Service Worker)** — đổi từ Notifee (19/10/2026); server node-cron là kênh nhắc chính |
 | Lập lịch server | node-cron |
 | CSDL | MongoDB + Mongoose (đổi từ MySQL theo yêu cầu người dùng 19/10/2026) |
+| Quản trị hệ thống | **Khu vực `/admin` ngoài M01–M08** — chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu (duyệt 20/10/2026). Thêm `users.role` (`user`/`admin`) và `users.disabled_at`; cấp admin đầu tiên bằng script `npm run admin:grant`; không có xóa tài khoản (chờ Q4) |
 
 Các giá trị đánh dấu *(mặc định đề xuất)* ở BUSINESS_RULES.md cần người dùng duyệt.
 
@@ -51,8 +52,9 @@ Các giá trị đánh dấu *(mặc định đề xuất)* ở BUSINESS_RULES.m
 
 - **Người cao tuổi** (chủ hồ sơ): toàn quyền với dữ liệu của mình.
 - **Người thân**: được ủy quyền qua kết nối M07 — quyền “xem lịch” hoặc (giai đoạn mở rộng) “thiết lập thuốc”.
+- **Quản trị viên** (hậu trường, `users.role='admin'`): dùng `/admin` để xem số liệu vận hành, khóa/mở tài khoản, đặt lại mật khẩu. **Không** đọc nội dung y tế chi tiết (tên thuốc, lý do không uống) và **không** phải màn hình M09.
 
-Cùng một website, phân biệt bằng quan hệ kết nối ở M07.
+Cùng một website, phân biệt bằng quan hệ kết nối ở M07 và cờ `role` ở CSDL.
 
 ## 7. Kết quả đầu ra giai đoạn PLAN
 

@@ -26,6 +26,7 @@
 | 404 | NOT_FOUND | Không tìm thấy tài nguyên |
 | 409 | CONFLICT | Xung đột (trùng xác nhận, trạng thái không cho phép) |
 | 429 | RATE_LIMITED | Quá số yêu cầu (mã mời, đăng nhập) |
+| 503 | SERVICE_UNAVAILABLE | Firebase Admin chưa cấu hình/chưa kết nối được (khóa tài khoản, đặt lại mật khẩu) |
 | 500 | INTERNAL_ERROR | Lỗi server |
 
 ### Phân quyền
@@ -34,7 +35,7 @@
 |---|---|
 | Chủ hồ sơ | Token UID khớp `user_id` của tài nguyên |
 | Người thân | UID có `family_connections` active với owner và `permissions.view_schedule=true` (xem) hoặc `manage_medication=true` (sửa — mở rộng) |
-| Admin hệ thống | Không có trong phạm vi |
+| Admin hệ thống | `users.role = 'admin'` — chỉ dùng cho khu vực `/api/v1/admin` (không đọc nội dung y tế chi tiết) |
 
 ## 2. Bảng endpoint
 
@@ -49,7 +50,7 @@
 | Method | Path | Quyền | Input | Output |
 |---|---|---|---|---|
 | POST | /users/me/sync | Đã đăng nhập Firebase | `{ displayName?, phone?, address?, timezone?, preferences? }` | Tạo/cập nhật bản ghi user theo firebase_uid (idempotent). `phone` chuẩn hoá `0xxxxxxxxx` (nhận `+84…`); `phone`/`address` rỗng = null |
-| GET | /users/me | Chủ hồ sơ | — | `{ id, phone, displayName, address, timezone, preferences }` |
+| GET | /users/me | Chủ hồ sơ | — | `{ id, phone, displayName, address, timezone, preferences, role }` (`role`: `'user' \| 'admin'`) |
 | PATCH | /users/me | Chủ hồ sơ | `{ displayName?, phone?, address?, timezone?, preferences? }` | Cập nhật tùy chọn M08. `phone` sai định dạng → 400; `phone`/`address` = `""`/`null` để xoá |
 
 ### 2.3 Thuốc
@@ -108,7 +109,26 @@
 
 > Ghi chú: route thiết bị nằm dưới `/users` (mount tại `/api/v1/users`) — đường dẫn đầy đủ là `/api/v1/users/devices/register` và `/api/v1/users/devices/unregister`.
 
-### 2.9 Sức khỏe — KHÔNG triển khai
+### 2.9 Quản trị hệ thống — chỉ `users.role = 'admin'`
+
+Khu vực hậu trường `/admin` (không phải màn hình M09). Mọi route dưới đây đều qua `requireAuthMiddleware` + `requireAdminMiddleware`; người dùng thường nhận **403 FORBIDDEN**, chưa đăng nhập nhận **401 UNAUTHENTICATED**.
+
+| Method | Path | Quyền | Input | Output |
+|---|---|---|---|---|
+| GET | /admin/summary | Admin | — | `{ users, disabledUsers, activeMedications, doses24h, confirmed24h, activeConnections, activeDevices, failedNotifications24h }` — chỉ số đếm; các số `24h` chỉ tính **24 giờ đã qua** (không gồm liều tương lai) |
+| GET | /admin/users | Admin | Query: `?q=&page=&pageSize=` (`pageSize` ≤ 50) | `{ items: [{ id, displayName, phone, email, role, disabled, timezone, createdAt, medicationsActive, doses7d, confirmed7d, devicesActive }], page, pageSize, total }`. Tìm theo tên/SĐT. **Không** trả tên thuốc, ghi chú, lý do không uống. `email` đọc một lần từ Firebase Admin (không lưu trong MongoDB); Firebase lỗi → `email = null`, trang vẫn hoạt động |
+| PATCH | /admin/users/:id/status | Admin | `{ disabled: boolean }` | Khóa/mở tài khoản: gọi Firebase `updateUser(uid, { disabled })`, thu hồi refresh token khi khóa, lưu `users.disabled_at`, ghi `audit_logs` (`admin_lock`/`admin_unlock`). Không thể tự khóa chính mình → 400 |
+| POST | /admin/users/:id/reset-password | Admin | `{ password }` (8–128 ký tự) | Đặt mật khẩu qua Firebase Admin (cần cho tài khoản SĐT dùng email nội bộ, không nhận được email đặt lại), thu hồi refresh token, ghi `audit_logs` (`admin_reset_password`). **Không** trả/ghi lại mật khẩu |
+| GET | /admin/notifications | Admin | Query: `?limit=` (≤ 100, mặc định 20) | Các `notification_logs` có `status='failed'`, mới nhất trước: `{ id, kind, channel, sentAt, error, doseId }` |
+| GET | /admin/audit-logs | Admin | Query: `?limit=` (≤ 100, mặc định 20) | Nhật ký thao tác gần đây: `{ id, action, entity, entityId, actorName, actorPhone, createdAt, details }`. `actorName/actorPhone` là tên tài khoản bị tác động; `details.admin_id` là quản trị viên đã thao tác (không trả mật khẩu) |
+
+**Khóa tài khoản**: ngoài việc chặn đăng nhập lại ở Firebase, backend kiểm tra `users.disabled_at` ngay trong `authMiddleware` → mọi API (kể cả `/users/me/sync`) trả **403 FORBIDDEN** với thông báo “Tài khoản đã bị khóa…”. Token cũ có hiệu lực tối đa 1 giờ nhưng không dùng được API trong thời gian đó.
+
+**Cấp quyền admin đầu tiên**: chạy `npm run admin:grant -- <email hoặc SĐT>` trong `backend/` (script `src/scripts/grantAdmin.ts`). Script tìm user qua Firebase (email) hoặc `users.phone` (SĐT) rồi đặt `role='admin'`. Không có endpoint tự cấp quyền admin.
+
+**Firebase Admin chưa cấu hình** → khóa/mở và đặt lại mật khẩu trả **503 SERVICE_UNAVAILABLE**; các route chỉ đọc vẫn chạy (trừ email = null).
+
+### 2.10 Sức khỏe — KHÔNG triển khai
 
 Theo phạm vi đã chốt (PROJECT_PLAN mục 4), nhóm API sức khỏe không được xây dựng ở phiên bản này. Nếu phạm vi đổi, bổ sung ở bản sửa đổi sau và cần duyệt lại.
 
@@ -127,11 +147,14 @@ Theo phạm vi đã chốt (PROJECT_PLAN mục 4), nhóm API sức khỏe không
 
 9. **Thông báo người thân (relative alert)**: khi lần uống **chưa được xác nhận quá `RELATIVE_ALERT_AFTER_MINUTES` phút** (mặc định **15**, cấu hình ở `backend/.env`) server gửi Web Push tới thiết bị của mọi người thân có kết nối `active` với `permissions.relative_alerts=true` (mặc định bật). Mốc tính là giờ đến hạn **cuối cùng** (`snoozed_until` nếu đã “nhắc lại sau”). Người thân đã xác nhận hoặc đánh dấu không thể uống → không gửi. Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống chỉ gửi một lần; nếu tới lúc chuyển `missed` (2 giờ) mà chưa từng gửi thì vẫn báo (lưới an toàn). Đây là push phía server, không có endpoint riêng.
 
+10. **Quản trị tối thiểu dữ liệu**: route admin **không** trả nội dung y tế (tên thuốc, hướng dẫn, lý do không uống) và **không** trả token FCM, `firebase_uid` của người khác. Mật khẩu mới do admin nhập chỉ chuyển tới Firebase, **không** lưu DB, không ghi log, không trả lại trong response. Mọi thao tác khóa/mở/đặt lại mật khẩu đều ghi `audit_logs` với `details.admin_id`.
+
 ---
 
 ## Điểm cần duyệt
 
-1. Danh sách 7 nhóm endpoint ở mục 2 (nhóm sức khỏe loại bỏ).
+1. Danh sách endpoint ở mục 2 (bao gồm nhóm quản trị 2.9; nhóm sức khỏe 2.10 loại bỏ).
 2. Bắt buộc `clientRequestId` cho xác nhận (idempotency).
 3. Người thân chỉ có quyền xem ở MVP; `manage_medication` chỉ mở ở mở rộng.
 4. Rate limit mã mời 5 lần/phút.
+5. **Đã duyệt 20/10/2026**: khu vực quản trị `/admin` ngoài M01–M08 — chỉ đọc + khóa/mở + đặt lại mật khẩu; thêm `users.role` và `users.disabled_at`. **Không** có xóa tài khoản (chờ Q4 — chính sách lưu trữ/xóa dữ liệu).

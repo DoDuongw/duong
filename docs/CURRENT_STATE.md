@@ -9,8 +9,8 @@ Ngày kiểm tra: 19/10/2026
 | Thư mục dự án `D:\duong` | Trống trước khi bắt đầu (ngoài `docs/` do Giai đoạn PLAN tạo) |
 | Backend hiện có | Không |
 | Mobile hiện có | Đã gỡ — `mobile/` (React Native + native android/ios) xóa ngày 19/10/2026 theo quyết định chuyển sang website |
-| Web hiện có | Đã nối API thật + Web Push + cài đặt M08 (20/10/2026) — `web/` (React + Vite + TypeScript + PWA): điều hướng, M01–M08, đăng nhập Firebase, đăng ký Web Push (FCM), banner nhắc trong trang, tài khoản/múi giờ/nhắc lại/thông báo người thân; 92 test (Vitest) |
-| Backend hiện có | Đã xong nghiệp vụ + thông báo (20/10/2026) — `backend/` (Express + TypeScript + Mongoose + MongoDB): API thuốc/lịch/lần uống/lịch sử/người thân, dịch vụ sinh lần uống, máy trạng thái, cron, dịch vụ Web Push + phân quyền người thân + thông báo người thân; 94 test (Jest) |
+| Web hiện có | Đã nối API thật + Web Push + cài đặt M08 (20/10/2026) — `web/` (React + Vite + TypeScript + PWA): điều hướng, M01–M08, đăng nhập Firebase, đăng ký Web Push (FCM), banner nhắc trong trang, tài khoản/múi giờ/nhắc lại/thông báo người thân; **khu vực quản trị `/admin` (R9)**: 157 test (Vitest) |
+| Backend hiện có | Đã xong nghiệp vụ + thông báo (20/10/2026) — `backend/` (Express + TypeScript + Mongoose + MongoDB): API thuốc/lịch/lần uống/lịch sử/người thân, dịch vụ sinh lần uống, máy trạng thái, cron, dịch vụ Web Push + phân quyền người thân + thông báo người thân; **API quản trị (R9)**: 146 test (Jest) |
 | package.json | Không (thư mục gốc) — chạy lệnh trong `backend/` hoặc `web/` |
 | Firebase (Auth Email/Mật khẩu, FCM Web Push, credentials) | **Auth Email/Mật khẩu đã bật và chạy thật** (dự án `medicationreminder-6177c`); credentials Admin ở `backend/.env` + `serviceAccountKey.json`; web config ở `web/.env`. **Web Push: code đã xong (Giai đoạn 5)** và **VAPID key đã tạo** (`VITE_FIREBASE_VAPID_KEY` trong `web/.env`, 20/10/2026) — còn chờ thao tác gửi/nhận push thật trên trình duyệt (Giai đoạn 7) |
 | Cơ chế đăng nhập hiện có | Không |
@@ -347,6 +347,29 @@ Luật hiển thị cảnh báo **khớp chính xác** luật gửi push ở bac
 **Kiểm chứng**: web **126/126** (15 file; **+8 test mới**: 5 cho `unconfirmedAlerts`/`isUnconfirmedByOwner`, 3 cho M07 cảnh báo / đã xác nhận không cảnh báo / “Không thể uống” không cảnh báo), `oxlint` sạch, `tsc -b` sạch, `npm run build` OK (**472,12 kB / gzip 143,29 kB**). Backend **không thay đổi**.
 
 **Chưa kiểm thử (ghi rõ)**: cảnh báo mới **chưa mở lại trên trình duyệt thật với 2 tài khoản** — cần chạy tay: chủ hồ sơ để một liều quá 15 phút không xác nhận → mở M07 bằng tài khoản người thân xem cảnh báo có hiện đúng. **Chưa điều tra được vì sao notification không hiện trên máy bạn** (nằm ngoài ứng dụng: tab đang mở / trung tâm thông báo Windows / Service Worker) — nếu vẫn cần, tôi sẽ hướng dẫn kiểm tra bằng DevTools.
+
+### 20/10/2026 — R9: khu vực quản trị `/admin`
+
+**Bối cảnh**: người dùng hỏi có nên có giao diện quản trị. Đối chiếu tài liệu: `API_SPEC.md` ghi admin “không có trong phạm vi”, nhưng README hứa tài khoản SĐT quên mật khẩu thì “liên hệ quản trị viên” — **không có công cụ nào tồn tại**. Người dùng chốt phạm vi **chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu**; duyệt thêm `users.role`, sau đó duyệt thêm `users.disabled_at`.
+
+**Ranh giới**: `/admin` nằm **ngoài M01–M08**, không phải màn hình M09; không đổi luồng 8 màn hình; **không có xóa tài khoản** (Q4 chưa chốt). Không thêm thư viện.
+
+**Backend**:
+
+| File | Nội dung |
+|---|---|
+| `models/User.ts` | `role: 'user'\|'admin'` (mặc định `user`), `disabled_at: Date\|null` |
+| `middlewares/auth.ts` | `authMiddleware` chặn tài khoản bị khóa bằng **403** trước khi gắn `req.user`; gắn `isAdmin`; thêm `requireAdminMiddleware` |
+| `config/firebase.ts` | `setFirebaseUserDisabled`, `setFirebaseUserPassword`, `revokeFirebaseRefreshTokens`, `getFirebaseUserEmails` (1 lần/trang), `getFirebaseUserByEmail`, `isFirebaseReady` |
+| `services/adminService.ts`, `routes/admin.ts` | Summary 24h; danh sách người dùng (tìm/phân trang, số đếm; **không** nội dung y tế); lỗi push; nhật ký; khóa/mở; đặt lại mật khẩu. Mọi thao tác ghi `audit_logs`, **không ghi mật khẩu** |
+| `routes/users.ts` | `GET/PATCH /users/me` trả thêm `role` |
+| `src/scripts/grantAdmin.ts` + `package.json` | `npm run admin:grant -- <email hoặc SĐT>` cấp admin đầu tiên; không có endpoint tự cấp |
+
+**Web**: route `/admin` + layout riêng (không tab bar) trong `App.tsx`; `screens/Admin.tsx` (8 thẻ số liệu, tìm kiếm, thẻ người dùng, phân trang, lỗi push, nhật ký, hộp thoại khóa/đặt lại mật khẩu); M08 hiện liên kết **chỉ khi** `profile.role='admin'`; thêm types/endpoints admin; CSS `.admin-*` dùng token y tế.
+
+**Kiểm chứng**: backend `tsc --noEmit` sạch + **146/146** test (9 suite; +24: 18 admin + 6 middleware R10–R15); web `tsc -b` sạch + oxlint sạch + **157/157** test (18 file; +8 admin) + build OK (**488,94 kB / gzip 147,00 kB**).
+
+**Chưa kiểm thử (ghi rõ, không đánh dấu đạt)**: (1) chưa mở `/admin` trên trình duyệt thật; (2) các lời gọi **Firebase thật** cho khóa/mở/đặt lại mật khẩu/lấy email đang được **mock** trong test — cần chạy với service account thật; (3) chưa kiểm tra token cũ bị chặn 403 ngay và đăng nhập lại bị Firebase chặn; (4) chưa thử đặt lại mật khẩu tài khoản SĐT rồi đăng nhập lại. Kịch bản tay A8–A14 ở `TEST_PLAN.md` §7.18.
 
 ## Câu hỏi mới
 

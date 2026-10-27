@@ -1,4 +1,4 @@
-# INTERFACE SPEC — Đặc tả màn hình M01–M08
+# INTERFACE SPEC — Đặc tả màn hình M01–M08 + khu vực quản trị
 
 ## Yêu cầu chung cho người cao tuổi
 
@@ -105,17 +105,34 @@ Giao diện luồng này đơn giản (email + mật khẩu, chữ lớn), dùng
 | Hạng mục | Nội dung |
 |---|---|
 | Mục tiêu | Tài khoản, tùy chỉnh, đăng xuất |
-| Thành phần | Email (đã xác thực); tên hiển thị; múi giờ; cỡ chữ (nhỏ/vừa/lớn); âm thanh; giọng đọc hướng dẫn (Web Speech API — ẩn nếu trình duyệt không hỗ trợ); cài đặt nhắc lại (số phút 5–30, số lần 1–5 — backend tuân theo); cấu hình thông báo cho người thân (bật/tắt `relative_alerts` theo từng kết nối); trạng thái quyền Notifications + hướng dẫn cấp quyền / “Thêm vào màn hình chính” (iOS); đăng xuất |
+| Thành phần | Email (đã xác thực); tên hiển thị; múi giờ; cỡ chữ (nhỏ/vừa/lớn); âm thanh; giọng đọc hướng dẫn (Web Speech API — ẩn nếu trình duyệt không hỗ trợ); cài đặt nhắc lại (số phút 5–30, số lần 1–5 — backend tuân theo); cấu hình thông báo cho người thân (bật/tắt `relative_alerts` theo từng kết nối); trạng thái quyền Notifications + hướng dẫn cấp quyền / “Thêm vào màn hình chính” (iOS); **liên kết “Quản trị hệ thống” (chỉ hiện khi `role='admin'`)**; đăng xuất |
 | API | `PATCH /users/me`, `PATCH /users/me/notification-settings`, `DELETE /users/devices/unregister` |
 | Kiểm tra trình duyệt | Giọng đọc: kiểm tra `speechSynthesis` trước khi hiển thị; quyền Notifications: hiển thị trạng thái thật; không lưu mật khẩu dạng văn bản |
 | Hành động | Đăng xuất → xác nhận → hủy token thiết bị, xóa phiên local, về luồng đăng nhập |
 
 ---
 
+## Khu vực quản trị `/admin` — NGOÀI M01–M08 (không phải M09)
+
+Khu vực hậu trường cho tài khoản `role='admin'`, giao diện riêng (không dùng bottom tab), mật độ thông tin cao hơn ứng dụng người cao tuổi nhưng vẫn dùng chung token màu y tế.
+
+| Hạng mục | Nội dung |
+|---|---|
+| Mục tiêu | Theo dõi hoạt động hệ thống, khóa/mở tài khoản, đặt lại mật khẩu cho người quên mật khẩu (đặc biệt tài khoản SĐT dùng email nội bộ) |
+| Điều kiện vào | `profile.role='admin'`; người thường thấy thông báo “không có quyền” + link về trang chủ, **không gọi API quản trị** |
+| Thành phần | Tiêu đề + nút “← Về ứng dụng”; 8 thẻ số liệu 24 giờ (người dùng, tài khoản khóa, thuốc đang dùng, liều, chưa xác nhận, kết nối người thân, thiết bị, push lỗi); ô tìm theo tên/SĐT; danh sách người dùng dạng thẻ (tên, SĐT, email, badge Quản trị/Đã khóa, 4 số đếm, ngày tạo, múi giờ); phân trang; mục lỗi gửi thông báo; nhật ký thao tác |
+| Hành động | “Khóa tài khoản”/“Mở khóa tài khoản” → hộp thoại xác nhận; “Đặt lại mật khẩu” → hộp thoại nhập mật khẩu mới + nhập lại (≥ 8 ký tự, kiểm tra khớp) |
+| API | `GET /admin/summary`, `GET /admin/users`, `PATCH /admin/users/:id/status`, `POST /admin/users/:id/reset-password`, `GET /admin/notifications`, `GET /admin/audit-logs` |
+| Riêng tư | **Không hiển thị** tên thuốc, hướng dẫn, lý do không uống; không hiển thị token FCM hay `firebase_uid` |
+| Trạng thái | Đang tải / lỗi (có thông báo + tải lại khi thao tác) / rỗng (“Không tìm thấy người dùng phù hợp”, “Không có lỗi gửi thông báo”, “Chưa có thao tác nào”) |
+| Truy cập | Nút ≥ 56px, chữ ≥ 15–16px cho bảng vận hành; hộp thoại `role="dialog"` + `aria-modal="true"`, đóng bằng nút ✕/Hủy; nhãn `aria-label` riêng cho từng người dùng để tránh trùng tên nút |
+
+---
+
 ## Truy cập (accessibility)
 
 - Tương phản chữ/nền tối thiểu WCAG AA.
-- Nút chính cao ≥ 48px.
+- Nút chính cao ≥ 56px.
 - Hỗ trợ phóng to cỡ chữ/zoom trình duyệt (tới 200%) mà không mất chức năng, không tràn nút.
 - Mô tả accessibility (`aria-label`) cho icon trạng thái trên M03; điều hướng bằng bàn phím cho người dùng máy tính.
 
@@ -127,3 +144,4 @@ Giao diện luồng này đơn giản (email + mật khẩu, chữ lớn), dùng
 2. Danh sách hành động cần xác nhận (Q5).
 3. Hộp thoại lý do “Không thể uống” có sẵn một số lý do phổ biến + nhập tự do.
 4. Mục hướng dẫn quyền Notifications/PWA đặt trong M08.
+5. **Đã duyệt 20/10/2026**: khu vực `/admin` là công cụ vận hành ngoài M01–M08 (không phải M09); chỉ đọc + khóa/mở + đặt lại mật khẩu, không hiển thị nội dung y tế chi tiết.

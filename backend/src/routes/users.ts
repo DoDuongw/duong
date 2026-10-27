@@ -103,6 +103,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
     }
 
     req.user!.userId = user!._id.toString();
+    req.user!.isAdmin = user!.role === 'admin' ? true : undefined;
     ok(res, {
       id: user!._id,
       phone: user!.phone,
@@ -110,6 +111,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
       address: user!.address,
       timezone: user!.timezone,
       preferences: user!.preferences,
+      role: user!.role,
     });
   } catch (e) {
     next(e);
@@ -127,6 +129,7 @@ router.get('/me', requireAuthMiddleware, async (req: Request, res: Response, nex
       address: user.address,
       timezone: user.timezone,
       preferences: user.preferences,
+      role: user.role,
     });
   } catch (e) {
     next(e);
@@ -161,6 +164,7 @@ router.patch('/me', requireAuthMiddleware, async (req: Request, res: Response, n
       address: user.address,
       timezone: user.timezone,
       preferences: user.preferences,
+      role: user.role,
     });
   } catch (e) {
     next(e);

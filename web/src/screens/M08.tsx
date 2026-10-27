@@ -363,6 +363,18 @@ export function M08() {
             </div>
           </Section>
 
+      {profile?.role === 'admin' && (
+        <Section
+          title="Quản trị hệ thống"
+          icon="🛡️"
+          description="Dành cho quản trị viên: theo dõi hoạt động, khóa tài khoản, đặt lại mật khẩu."
+        >
+          <Link to="/admin" className="admin-entry">
+            Mở trang quản trị →
+          </Link>
+        </Section>
+      )}
+
       <Section title="Đăng xuất" icon="🚪">
         {!confirmLogout ? (
           <Button variant="danger" block onClick={() => setConfirmLogout(true)}>

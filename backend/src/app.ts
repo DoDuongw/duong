@@ -7,6 +7,7 @@ import { medicationsRouter } from './routes/medications';
 import { dosesRouter } from './routes/doses';
 import { historyRouter } from './routes/history';
 import { familyRouter } from './routes/family';
+import { adminRouter } from './routes/adminRoot';
 import { env } from './config/env';
 
 export function createApp() {
@@ -25,6 +26,7 @@ export function createApp() {
   app.use('/api/v1/doses', dosesRouter);
   app.use('/api/v1/history', historyRouter);
   app.use('/api/v1/family', familyRouter);
+  app.use('/api/v1/admin', adminRouter);
 
   app.use(errorHandler);
   return app;

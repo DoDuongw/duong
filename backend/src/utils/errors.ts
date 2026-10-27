@@ -18,3 +18,5 @@ export const notFound = (message = 'Không tìm thấy') => new ApiError(404, 'N
 export const conflict = (message: string) => new ApiError(409, 'CONFLICT', message);
 export const rateLimited = (message: string) => new ApiError(429, 'RATE_LIMITED', message);
 export const internal = (message = 'Lỗi máy chủ') => new ApiError(500, 'INTERNAL_ERROR', message);
+export const serviceUnavailable = (message = 'Dịch vụ tạm thời không khả dụng') =>
+  new ApiError(503, 'SERVICE_UNAVAILABLE', message);

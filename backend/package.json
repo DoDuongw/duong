@@ -6,6 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "admin:grant": "ts-node src/scripts/grantAdmin.ts",
     "test": "jest --runInBand",
     "lint": "tsc --noEmit"
   },

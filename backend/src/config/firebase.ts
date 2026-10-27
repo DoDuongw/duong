@@ -87,3 +87,57 @@ export async function verifyIdToken(token: string): Promise<{ uid: string }> {
   const decoded = await admin.auth().verifyIdToken(token);
   return { uid: decoded.uid };
 }
+
+/** Firebase Admin đã sẵn sàng chưa (đã nạp credentials) */
+export function isFirebaseReady(): boolean {
+  initFirebase();
+  return initialized;
+}
+
+function requireAuth(): admin.auth.Auth {
+  initFirebase();
+  if (!initialized) {
+    const err = new Error('Firebase Admin chưa được cấu hình');
+    (err as Error & { code?: string }).code = 'FIREBASE_NOT_CONFIGURED';
+    throw err;
+  }
+  return admin.auth();
+}
+
+/** Khóa/mở tài khoản phía Firebase — chặn cả việc đăng nhập lại */
+export async function setFirebaseUserDisabled(uid: string, disabled: boolean): Promise<void> {
+  await requireAuth().updateUser(uid, { disabled });
+}
+
+/** Đặt mật khẩu mới (dùng cho tài khoản email nội bộ <sđt>@med.local không nhận được email đặt lại) */
+export async function setFirebaseUserPassword(uid: string, password: string): Promise<void> {
+  await requireAuth().updateUser(uid, { password });
+}
+
+/** Thu hồi refresh token — phiên cũ hết hiệu lực (ID token tối đa 1 giờ) */
+export async function revokeFirebaseRefreshTokens(uid: string): Promise<void> {
+  await requireAuth().revokeRefreshTokens(uid);
+}
+
+/** Tìm uid theo email Firebase (dùng cho script cấp quyền admin đầu tiên) */
+export async function getFirebaseUserByEmail(email: string): Promise<{ uid: string } | null> {
+  try {
+    const user = await requireAuth().getUserByEmail(email);
+    return { uid: user.uid };
+  } catch (err) {
+    if ((err as { code?: string }).code === 'auth/user-not-found') return null;
+    throw err;
+  }
+}
+
+/** Lấy email của nhiều uid trong MỘT lần gọi (tối đa 100) — danh sách admin chỉ đọc */
+export async function getFirebaseUserEmails(uids: string[]): Promise<Record<string, string | null>> {
+  const result: Record<string, string | null> = {};
+  if (uids.length === 0) return result;
+  const auth = requireAuth();
+  const batch = uids.slice(0, 100);
+  const found = await auth.getUsers(batch.map((uid) => ({ uid })));
+  for (const uid of batch) result[uid] = null;
+  for (const user of found.users) result[user.uid] = user.email ?? null;
+  return result;
+}

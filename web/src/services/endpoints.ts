@@ -1,5 +1,9 @@
 import { apiFetch } from './api';
 import type {
+  AdminAuditItem,
+  AdminFailedNotification,
+  AdminSummary,
+  AdminUserPage,
   DayDoses,
   Dose,
   DoseWithMedication,
@@ -210,4 +214,30 @@ export function updateFamilyPermissions(
 
 export function revokeFamilyConnection(connectionId: string): Promise<{ id: string; status: string }> {
   return apiFetch(`/family/connections/${connectionId}`, { method: 'DELETE' });
+}
+
+/* ---------- Quản trị (chỉ role='admin') ---------- */
+
+export function getAdminSummary(): Promise<AdminSummary> {
+  return apiFetch<AdminSummary>('/admin/summary');
+}
+
+export function getAdminUsers(params: { q?: string; page?: number; pageSize?: number }): Promise<AdminUserPage> {
+  return apiFetch<AdminUserPage>(`/admin/users${query(params)}`);
+}
+
+export function setAdminUserDisabled(id: string, disabled: boolean): Promise<{ id: string; disabled: boolean }> {
+  return apiFetch(`/admin/users/${id}/status`, { method: 'PATCH', body: { disabled } });
+}
+
+export function adminResetPassword(id: string, password: string): Promise<{ id: string; reset: true }> {
+  return apiFetch(`/admin/users/${id}/reset-password`, { method: 'POST', body: { password } });
+}
+
+export function getAdminNotifications(limit = 20): Promise<AdminFailedNotification[]> {
+  return apiFetch<AdminFailedNotification[]>(`/admin/notifications${query({ limit })}`);
+}
+
+export function getAdminAuditLogs(limit = 20): Promise<AdminAuditItem[]> {
+  return apiFetch<AdminAuditItem[]>(`/admin/audit-logs${query({ limit })}`);
 }

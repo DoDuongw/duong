@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyIdToken } from '../config/firebase';
 import { User } from '../models/User';
-import { unauthenticated } from '../utils/errors';
+import { unauthenticated, forbidden } from '../utils/errors';
 import { env } from '../config/env';
 
 export interface AuthUser {
@@ -10,6 +10,8 @@ export interface AuthUser {
   userId?: string;
   /** Múi giờ của người dùng (mặc định TZ_DEFAULT) — dùng để quy đổi ngày/giờ địa phương */
   timezone: string;
+  /** true khi users.role = 'admin' (không gắn false để giữ nguyên dạng cũ của req.user) */
+  isAdmin?: boolean;
 }
 
 declare global {
@@ -40,10 +42,16 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
   try {
     const { uid } = await verifyIdToken(token);
     const user = await User.findOne({ firebase_uid: uid });
+    // Tài khoản bị quản trị khóa: chặn ngay mọi API (kể cả đồng bộ hồ sơ)
+    if (user?.disabled_at) {
+      next(forbidden('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.'));
+      return;
+    }
     req.user = {
       uid,
       userId: user ? user._id.toString() : undefined,
       timezone: user?.timezone || env.TZ_DEFAULT,
+      ...(user?.role === 'admin' ? { isAdmin: true } : {}),
     };
     next();
   } catch (err) {
@@ -85,6 +93,19 @@ export function currentTimezone(req: Request): string {
 export function requireAuthMiddleware(req: Request, _res: Response, next: NextFunction): void {
   if (!req.user?.userId) {
     next(unauthenticated());
+    return;
+  }
+  next();
+}
+
+/** Cần tài khoản quản trị (users.role = 'admin') — dùng cho toàn bộ /api/v1/admin */
+export function requireAdminMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  if (!req.user?.userId) {
+    next(unauthenticated());
+    return;
+  }
+  if (!req.user.isAdmin) {
+    next(forbidden('Chỉ quản trị viên mới được truy cập'));
     return;
   }
   next();

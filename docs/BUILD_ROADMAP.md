@@ -154,6 +154,16 @@ Thứ tự: **M04 → M05 → M03 → M01 → M02 → M06**. Mỗi màn hình: n
 
 **Còn lại sau bàn giao (không thuộc phạm vi tự động hoá)**: 2 kịch bản push cần thiết bị/tài khoản thật (**N7** iOS, **N12** người thân); xoay/xóa khóa service account cũ trên Firebase Console nếu nghi ngờ lộ.
 
+### Bổ sung sau Giai đoạn 8 — R9: khu vực quản trị `/admin` (20/10/2026)
+
+**Ngoài roadmap gốc, do người dùng yêu cầu và đã duyệt**: khu vực hậu trường **không phải M09**, chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu. Thay đổi CSDL đã duyệt: `users.role`, `users.disabled_at`.
+
+- **Backend**: `models/User.ts`, `middlewares/auth.ts` (chặn tài khoản khóa + `requireAdminMiddleware`), `config/firebase.ts` (disabled/password/revoke/email batch), `services/adminService.ts`, `routes/admin.ts`, mount `/api/v1/admin`, script `src/scripts/grantAdmin.ts` + `npm run admin:grant`.
+- **Web**: route `/admin` + `screens/Admin.tsx`, link trong M08 chỉ khi `role='admin'`, types/endpoints, CSS `.admin-*`, test `admin.test.tsx`.
+- **Tài liệu**: API_SPEC §2.9, DATABASE_PLAN §3.1 + migration 006, BUSINESS_RULES §8, INTERFACE_SPEC (khu vực `/admin`), TEST_PLAN §7.18 (A8–A14), CURRENT_STATE R9.
+- **Kiểm thử**: backend **146/146**, web **157/157**, typecheck/lint sạch, build web OK. **Chưa chạy Firebase thật** cho khóa/mở/đặt lại mật khẩu (test mock) và **chưa mở `/admin` trên trình duyệt thật** — xem TEST_PLAN §7.18.
+- **Không làm**: xóa tài khoản (Q4), phân quyền admin chi tiết hơn (nhiều cấp), xem nội dung y tế.
+
 ## Phụ thuộc giữa các giai đoạn
 
 | Giai đoạn | Phụ thuộc | Song song |

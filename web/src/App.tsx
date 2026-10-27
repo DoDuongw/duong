@@ -12,6 +12,7 @@ import { M05 } from './screens/M05';
 import { M06 } from './screens/M06';
 import { M07 } from './screens/M07';
 import { M08 } from './screens/M08';
+import { Admin } from './screens/Admin';
 import { Login } from './screens/Login';
 import { AuthProvider } from './store/auth';
 import { useAuth } from './store/authContext';
@@ -113,6 +114,16 @@ export default function App() {
               <RequireAuth>
                 <Shell showTabs={false}>
                   <M07 />
+                </Shell>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth>
+                <Shell showTabs={false}>
+                  <Admin />
                 </Shell>
               </RequireAuth>
             }

@@ -82,7 +82,7 @@ Trình duyệt: N1–N11 chạy trên Chrome/Edge (desktop + Android); trên iOS
 | U3 | Confirm khi server trả 500 | Không hiển thị thành công; giữ trạng thái cũ |
 | U4 | M05 nhập dữ liệu lỗi mạng khi lưu | Dữ liệu form giữ nguyên |
 | U5 | Phóng to cỡ chữ/zoom trình duyệt 200% | Không mất chức năng, không tràn chữ mất nút |
-| U6 | Rà soát | Không màn hình nào ngoài M01–M08 và luồng đăng nhập Email |
+| U6 | Rà soát | Không màn hình người dùng nào ngoài M01–M08 và luồng đăng nhập Email; `/admin` là khu vực hậu trường riêng (không phải M09) |
 | U7 | Xem trên khung điện thoại (375×667) và máy tính (1280×800) | Bố cục đúng, nút chính dễ bấm ở cả hai |
 
 ### 5.1 Đã tự động hóa ở Giai đoạn 4 (Vitest + RTL)
@@ -149,7 +149,7 @@ Trình duyệt: N1–N11 chạy trên Chrome/Edge (desktop + Android); trên iOS
 - Smoke test API live (`:3000`): `/health` 200; các route cần đăng nhập khi không token → 401; route lạ → 404; JSON hỏng → 400.
 - E2E thật (Firebase Auth + backend + MongoDB, tài khoản tạm tạo → dùng → **xoá sạch**): **23/23 bước đạt** — đăng ký & sync hồ sơ; cài đặt nhắc lại (lưu + ngoài khoảng → 400); tạo thuốc 3 lịch → 201 và thiếu tên → 400; `/doses/today` đúng số lần uống và `scheduledAt` lưu UTC; confirm idempotent (cùng `confirmedAt`); snooze đúng 15 phút theo cài đặt và lần 2 → 409; cannot-take + thiếu lý do → 400; `/history`; S3 (403); tạo/chấp nhận mã mời; người thân xem lịch hộ (200) nhưng ghi thuốc hộ → 403; bật/tắt `relative_alerts`; ngắt kết nối → 403 ngay.
 - S9 kiểm tra live trong MongoDB: bản ghi mã mời chỉ có `code_hash`, đúng SHA-256 của mã, **không** lưu mã thô.
-- U6 rà soát `web/src/App.tsx`: đúng **M01–M08 + Login**, không màn hình thừa.
+- U6 rà soát `web/src/App.tsx`: đúng **M01–M08 + Login**, không màn hình thừa; `/admin` là route hậu trường riêng (R9).
 - **Phát hiện 1 lỗi thật khi người dùng chạy thao tác tay và đã sửa** (chi tiết §7.7): tài khoản đăng nhập lần đầu không tạo được bản ghi người dùng → mọi API sau đó trả 401. Sau khi sửa, hồi quy đầy đủ vẫn sạch.
 
 ### 7.1 Nghiệp vụ (B1–B18)
@@ -216,7 +216,7 @@ Trình duyệt: N1–N11 chạy trên Chrome/Edge (desktop + Android); trên iOS
 | U3 | đạt (tự động) | `screens.test.tsx` (M02) — chỉ báo “Đã xác nhận” sau khi API trả về; lỗi hiện thông báo + nút thử lại. |
 | U4 | đạt (tự động) | `screens.test.tsx` (M05) — giữ nguyên dữ liệu form khi API lỗi. |
 | U5 | đạt | Người dùng chạy tay: zoom trình duyệt **200%** → đi qua các màn hình, không mất nút/tràn chữ. |
-| U6 | đạt (rà soát) | `App.tsx`: đúng M01–M08 + luồng Login Email, không màn hình thừa. |
+| U6 | đạt (rà soát) | `App.tsx`: đúng M01–M08 + luồng Login Email, không màn hình thừa; `/admin` tách riêng cho quản trị (R9). |
 | U7 | đạt | Người dùng chạy tay: devtools responsive **375×667** và **1280×800** → bố cục đúng, nút chính dễ bấm. |
 
 ### 7.5 Tổng hợp
@@ -410,3 +410,44 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 | A5 | Chủ hồ sơ bấm **“Không thể uống”** → người thân tải lại M07 | **Không còn** khối cảnh báo |
 | A6 | Tài khoản người thân bị tắt `view_schedule` | Không hiện cảnh báo (và không hiện lịch) |
 | A7 | Kiểm tra tương phản khối cảnh báo (nền `--c-danger-soft`, viền `--c-danger`) ở zoom 200% | Chữ đỏ trên nền hồng nhạt đọc rõ; viền trái 5px thấy được |
+
+### 7.18 Đợt 11 — khu vực quản trị `/admin` (20/10/2026)
+
+**Bối cảnh**: người dùng hỏi dự án có nên có giao diện quản trị. Đối chiếu `API_SPEC.md` cũ (“Admin hệ thống — không có trong phạm vi”), `README` lại hứa “liên hệ quản trị viên” khi tài khoản SĐT quên mật khẩu nhưng **không có công cụ nào**. Người dùng chốt: **chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu**, duyệt thêm `users.role`; sau đó duyệt thêm `users.disabled_at` để khóa có hiệu lực ngay.
+
+**Giới hạn phạm vi**: `/admin` là **khu vực hậu trường ngoài M01–M08**, không phải màn hình M09; không đổi luồng nghiệp vụ của 8 màn hình; **không có xóa tài khoản** (Q4 chưa chốt).
+
+**Backend đã làm**:
+- `models/User.ts`: `role: 'user'|'admin'` (mặc định `user`), `disabled_at: Date|null`.
+- `middlewares/auth.ts`: chặn tài khoản bị khóa bằng **403** ngay trong `authMiddleware`; gắn `isAdmin`; thêm `requireAdminMiddleware`.
+- `config/firebase.ts`: `setFirebaseUserDisabled`, `setFirebaseUserPassword`, `revokeFirebaseRefreshTokens`, `getFirebaseUserEmails` (1 lần/trang), `getFirebaseUserByEmail`, `isFirebaseReady`.
+- `services/adminService.ts` + `routes/admin.ts` + mount `/api/v1/admin`: summary, danh sách người dùng (tìm/phân trang, **không** nội dung y tế), lỗi push, nhật ký, khóa/mở, đặt lại mật khẩu. Khóa/mở/đặt lại mật khẩu ghi `audit_logs`, không ghi mật khẩu.
+- `src/scripts/grantAdmin.ts` + `npm run admin:grant -- <email hoặc SĐT>`: cấp admin đầu tiên (không có endpoint tự cấp).
+- `GET/PATCH /users/me` trả thêm `role`.
+
+**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; M08 hiện liên kết “Quản trị hệ thống” **chỉ khi** `profile.role='admin'`; types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại).
+
+**Kết quả chạy lệnh (đã chạy thật)**:
+- Backend: `npm run lint` (`tsc --noEmit`) sạch; `npm test` **146/146** (9 suite; **+24 test**: 18 `tests/admin.test.ts` + 6 middleware R10–R15).
+- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **157/157** (18 file; **+8** `admin.test.tsx`); `npm run build` OK (**488,94 kB / gzip 147,00 kB**; CSS 17,27 kB / gzip 3,68 kB).
+
+**Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công.
+
+**CHƯA KIỂM THỬ (ghi rõ, không đánh dấu đạt)**:
+1. **Chưa mở `/admin` trên trình duyệt thật**; chưa chạy **A8–A14** dưới đây.
+2. **Chưa gọi Firebase thật** cho khóa/mở/đặt lại mật khẩu và lấy email hàng loạt — test backend **mock** các hàm này. Cần chạy với service account thật để xác nhận `updateUser({disabled})`, `updateUser({password})`, `revokeRefreshTokens`, `getUsers` hoạt động đúng.
+3. Chưa kiểm tra **token cũ sau khi khóa**: API phải trả 403 ngay; đăng nhập lại phải bị Firebase chặn.
+4. Chưa kiểm tra **đặt lại mật khẩu cho tài khoản SĐT** rồi đăng nhập bằng mật khẩu mới trên thiết bị thật.
+5. Không có xóa tài khoản (chờ Q4).
+
+**Kịch bản kiểm thử tay mới — quản trị**:
+
+| Bước | Thao tác | Kết quả mong đợi |
+|---|---|---|
+| A8 | Trong `backend/`, chạy `npm run admin:grant -- <email hoặc SĐT của bạn>` | In “Đã cấp quyền admin…”; M08 xuất hiện mục “Quản trị hệ thống” |
+| A9 | Đăng nhập tài khoản **thường**, mở thẳng `/admin` | Thấy “Tài khoản của bạn không có quyền truy cập…”, không có số liệu; API admin trả 403 |
+| A10 | Admin mở `/admin` | Thấy 8 thẻ số liệu, danh sách người dùng, mục lỗi push, nhật ký; **không** thấy tên thuốc/lý do không uống |
+| A11 | Tìm theo tên và SĐT; bấm trang sau | Kết quả lọc đúng; phân trang đúng, không tải lại toàn trang |
+| A12 | Khóa một tài khoản thử → mở cửa sổ ẩn danh đăng nhập tài khoản đó | Đăng nhập bị chặn (Firebase disabled); token cũ gọi API nhận 403 “Tài khoản đã bị khóa…” |
+| A13 | Mở khóa → đăng nhập lại | Vào được bình thường; badge “Đã khóa” biến mất; nhật ký có `admin_lock` + `admin_unlock` |
+| A14 | Đặt lại mật khẩu cho tài khoản SĐT → đăng xuất tài khoản đó → đăng nhập bằng mật khẩu mới | Đăng nhập thành công; nhật ký có `admin_reset_password`; **không** thấy mật khẩu trong UI/nhật ký/DB |

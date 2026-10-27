@@ -62,9 +62,10 @@ sequenceDiagram
 
 | Thành phần | Trách nhiệm |
 |---|---|
-| Web (`web/`) | Giao diện M01–M08 responsive, đăng nhập Firebase, đăng ký token Web Push, hiển thị thông báo trong trang, gọi API, PWA manifest |
+| Web (`web/`) | Giao diện M01–M08 responsive + khu vực quản trị `/admin` (ngoài M01–M08), đăng nhập Firebase, đăng ký token Web Push, hiển thị thông báo trong trang, gọi API, PWA manifest |
 | Service Worker | Nhận Web Push từ FCM khi trang đóng/mở, hiển thị notification, bấm → mở M02; hủy notification đã hiển thị khi xác nhận |
-| Backend | Xác minh ID token, phân quyền, kiểm tra dữ liệu đầu vào, nghiệp vụ, cung cấp API, nhật ký thay đổi |
+| Backend | Xác minh ID token, phân quyền (chủ hồ sơ/người thân/admin), kiểm tra dữ liệu đầu vào, nghiệp vụ, cung cấp API, nhật ký thay đổi |
+| Quản trị (`/api/v1/admin`) | Chỉ `role='admin'`: số liệu chỉ đọc, danh sách người dùng không nội dung y tế, khóa/mở (đồng bộ Firebase + DB), đặt lại mật khẩu qua Firebase Admin, xem lỗi push/nhật ký |
 | node-cron (src/jobs) | Chạy mỗi phút: sinh lần uống từ lịch, **gửi Web Push đúng giờ uống**, phát hiện quá giờ/bỏ qua |
 | FCM (Web Push) | Kênh nhắc từ server: giờ uống, quá giờ, đồng bộ lịch, thông báo tới người thân |
 | MongoDB | Lưu toàn bộ dữ liệu nghiệp vụ |
@@ -89,13 +90,14 @@ sequenceDiagram
 - Toàn bộ API trong một backend Express. Mọi endpoint yêu cầu Firebase ID token hợp lệ, trừ endpoint health check được ghi rõ.
 - Thời gian lưu UTC ở server; hiển thị theo múi giờ người dùng (mặc định Asia/Ho_Chi_Minh).
 - Phản hồi JSON thống nhất: `{ success, data?, error? { code, message } }` — chi tiết ở API_SPEC.md.
-- Log không chứa dữ liệu nhạy cảm, token, khóa dịch vụ.
+- Log không chứa dữ liệu nhạy cảm, token, khóa dịch vụ, **mật khẩu do admin đặt lại**.
+- Phân quyền admin kiểm tra ở `authMiddleware` (`users.role`) + `requireAdminMiddleware`; không tin cờ phía client. Tài khoản có `disabled_at` bị chặn 403 trước khi vào route.
 - Biến môi trường: `NODE_ENV`, `PORT`, `MONGODB_URI`, `FIREBASE_PROJECT_ID`, `TZ_DEFAULT` — mẫu ở `.env.example`.
 - Cấu trúc thư mục:
 
 ```
 backend/  src/config, src/middlewares, src/models, src/routes, src/controllers, src/services, src/jobs, src/utils, tests/
-web/      src/screens (M01–M08), src/components, src/services, src/store, src/hooks, src/theme, src/types, src/__tests__/, public/ (manifest.webmanifest, sw.js, icons)
+web/      src/screens (M01–M08 + Admin), src/components, src/services, src/store, src/hooks, src/theme, src/types, src/__tests__/, public/ (manifest.webmanifest, sw.js, icons)
 docs/     tài liệu PLAN
 ```
 

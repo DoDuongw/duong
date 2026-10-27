@@ -25,6 +25,8 @@ export interface UserProfile {
   address: string | null;
   timezone: string;
   preferences: UserPreferences | null;
+  /** 'admin' = tài khoản quản trị (thấy mục /admin); backend luôn trả về */
+  role?: 'user' | 'admin';
 }
 
 export interface MedicationSchedule {
@@ -143,4 +145,59 @@ export interface FamilyConnectionItem {
 export interface FamilyInviteCreated {
   code: string;
   expiresAt: string;
+}
+
+/* ---------- Khu vực quản trị (chỉ role='admin') ---------- */
+
+export interface AdminSummary {
+  users: number;
+  disabledUsers: number;
+  activeMedications: number;
+  doses24h: number;
+  confirmed24h: number;
+  activeConnections: number;
+  activeDevices: number;
+  failedNotifications24h: number;
+}
+
+export interface AdminUserItem {
+  id: string;
+  displayName: string | null;
+  phone: string | null;
+  email: string | null;
+  role: 'user' | 'admin';
+  disabled: boolean;
+  timezone: string;
+  createdAt: string;
+  medicationsActive: number;
+  doses7d: number;
+  confirmed7d: number;
+  devicesActive: number;
+}
+
+export interface AdminUserPage {
+  items: AdminUserItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface AdminFailedNotification {
+  id: string;
+  kind: string;
+  channel: string;
+  sentAt: string;
+  error: string | null;
+  doseId: string;
+}
+
+export interface AdminAuditItem {
+  id: string;
+  action: string;
+  entity: string;
+  entityId: string;
+  actorName: string | null;
+  actorPhone: string | null;
+  createdAt: string;
+  details: Record<string, unknown> | null;
 }
