@@ -130,10 +130,44 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
     expect(await screen.findByText('Bà Lan')).toBeInTheDocument();
     expect(screen.getAllByText('12').length).toBeGreaterThan(0);
     expect(screen.getByText('Tài khoản bị khóa')).toBeInTheDocument();
-    expect(screen.getByText('Push lỗi')).toBeInTheDocument();
+    expect(screen.getAllByText('Lỗi gửi thông báo').length).toBeGreaterThan(0);
     expect(screen.getByText(/0912345678 · lan@example.com/)).toBeInTheDocument();
     expect(screen.getByText(/Tạo ngày/)).toBeInTheDocument();
+    expect(screen.getByText(/Múi giờ Việt Nam \(GMT\+7\)/)).toBeInTheDocument();
     expect(screen.queryByText(/Thuốc test/)).not.toBeInTheDocument();
+  });
+
+  it('dịch mã lỗi gửi thông báo và nhãn nhật ký sang tiếng Việt', async () => {
+    vi.mocked(getAdminNotifications).mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'scheduled_reminder',
+        channel: 'fcm',
+        sentAt: '2026-10-20T03:00:00.000Z',
+        error: 'no_active_device',
+        doseId: 'd1',
+      },
+    ]);
+    vi.mocked(getAdminAuditLogs).mockResolvedValue([
+      {
+        id: 'a1',
+        action: 'accept_invite',
+        entity: 'connection',
+        entityId: 'c1',
+        actorName: 'Bà Lan',
+        actorPhone: null,
+        createdAt: '2026-10-20T03:00:00.000Z',
+        details: null,
+      },
+    ]);
+    renderAdmin();
+    await screen.findByText('Bà Lan');
+
+    expect(await screen.findByText('Thiết bị hiện không hoạt động')).toBeInTheDocument();
+    expect(screen.queryByText('no_active_device')).not.toBeInTheDocument();
+    expect(await screen.findByText('Chấp nhận lời mời')).toBeInTheDocument();
+    expect(screen.queryByText(/accept_invite/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bconnection\b/)).not.toBeInTheDocument();
   });
 
   it('tìm kiếm theo tên → gọi API với q và quay về trang 1', async () => {

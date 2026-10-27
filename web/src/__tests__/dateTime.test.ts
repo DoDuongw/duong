@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buoiOfTime, formatDate, formatDisplayDate, formatTime, shiftYmd, todayYmd } from '../utils/dateTime';
+import {
+  buoiOfTime,
+  formatDate,
+  formatDisplayDate,
+  formatTimezoneLabel,
+  formatTime,
+  shiftYmd,
+  todayYmd,
+} from '../utils/dateTime';
 
 describe('buoiOfTime (nhóm lịch theo buổi)', () => {
   it('chia đúng 4 buổi', () => {
@@ -23,6 +31,18 @@ describe('formatTime / formatDate (theo múi giờ người dùng)', () => {
     expect(formatDate('2026-10-19T00:30:00.000Z')).toBe('19/10/2026');
     // 17:30Z 19/10 → 00:30 20/10 ở VN
     expect(formatDate('2026-10-19T17:30:00.000Z')).toBe('20/10/2026');
+  });
+});
+
+describe('formatTimezoneLabel (nhãn múi giờ tiếng Việt)', () => {
+  it('đổi các múi giờ thường dùng sang nhãn tiếng Việt kèm GMT', () => {
+    expect(formatTimezoneLabel('Asia/Ho_Chi_Minh')).toBe('Việt Nam (GMT+7)');
+    expect(formatTimezoneLabel('Asia/Tokyo')).toBe('Nhật Bản (GMT+9)');
+    expect(formatTimezoneLabel('UTC')).toBe('Giờ quốc tế (GMT+0)');
+  });
+
+  it('múi giờ không nhận diện được → giữ nguyên mã, không làm hỏng giao diện', () => {
+    expect(formatTimezoneLabel('Not/AZone')).toBe('Not/AZone');
   });
 });
 

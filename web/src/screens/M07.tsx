@@ -21,7 +21,15 @@ import {
   updateFamilyPermissions,
 } from '../services/endpoints';
 import type { DayDoses, FamilyConnectionItem } from '../types';
-import { BUOI_LABEL, formatDisplayDate, shiftYmd, todayYmd, buoiOfIso, type Buoi } from '../utils/dateTime';
+import {
+  BUOI_LABEL,
+  formatDisplayDate,
+  formatTimezoneLabel,
+  shiftYmd,
+  todayYmd,
+  buoiOfIso,
+  type Buoi,
+} from '../utils/dateTime';
 
 const BUOIS: Buoi[] = ['sang', 'trua', 'chieu', 'toi'];
 
@@ -383,7 +391,7 @@ function RelativeSchedule({
       icon="📅"
       description={
         canView
-          ? `${formatDisplayDate(date)} · giờ theo múi giờ ${timezone}`
+          ? `${formatDisplayDate(date)} · giờ theo múi giờ ${formatTimezoneLabel(timezone)}`
           : undefined
       }
     >

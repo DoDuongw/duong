@@ -12,7 +12,15 @@ import { getDosesByDate } from '../services/endpoints';
 import { useOwnerView } from '../hooks/useOwnerView';
 import { useAuth } from '../store/authContext';
 import type { DoseWithMedication } from '../types';
-import { BUOI_LABEL, buoiOfIso, formatDisplayDate, shiftYmd, todayYmd, type Buoi } from '../utils/dateTime';
+import {
+  BUOI_LABEL,
+  buoiOfIso,
+  formatDisplayDate,
+  formatTimezoneLabel,
+  shiftYmd,
+  todayYmd,
+  type Buoi,
+} from '../utils/dateTime';
 
 const BUOIS: Buoi[] = ['sang', 'trua', 'chieu', 'toi'];
 const BUOI_ICON: Record<Buoi, string> = { sang: '🌅', trua: '☀️', chieu: '🌤️', toi: '🌙' };
@@ -60,7 +68,11 @@ export function M03() {
         </Notice>
       )}
 
-      <Section title="Chọn ngày" icon="📅" description={`Giờ hiển thị theo múi giờ ${viewTimezone}`}>
+      <Section
+        title="Chọn ngày"
+        icon="📅"
+        description={`Giờ hiển thị theo múi giờ ${formatTimezoneLabel(viewTimezone)}`}
+      >
         <div className="row" style={{ marginBottom: 12 }}>
           <Button variant="secondary" onClick={() => setDateOverride(shiftYmd(date, -1))} aria-label="Ngày trước">
             ← Ngày trước

@@ -20,6 +20,7 @@ import type {
   AdminUserItem,
   AdminUserPage,
 } from '../types';
+import { formatTimezoneLabel } from '../utils/dateTime';
 
 const PAGE_SIZE = 10;
 
@@ -41,8 +42,47 @@ const ACTION_LABEL: Record<string, string> = {
   revoke: 'Thu hồi',
   discontinue: 'Ngừng thuốc',
   confirm: 'Xác nhận uống',
+  cannot_take: 'Không thể uống',
   snooze: 'Nhắc lại',
+  accept_invite: 'Chấp nhận lời mời',
+  update_permissions: 'Đổi quyền xem',
+  archive: 'Lưu trữ lịch',
+  update_version: 'Đổi lịch uống',
 };
+
+const ENTITY_LABEL: Record<string, string> = {
+  user: 'Tài khoản',
+  dose: 'Lần uống thuốc',
+  invite: 'Lời mời kết nối',
+  connection: 'Kết nối người thân',
+  medication: 'Thuốc',
+  schedule: 'Lịch uống thuốc',
+};
+
+const NOTIFICATION_ERROR_LABEL: Record<string, string> = {
+  no_active_device: 'Thiết bị hiện không hoạt động',
+  token_invalid: 'Mã nhận thông báo không còn hiệu lực',
+  send_failed: 'Gửi thông báo thất bại',
+  FIREBASE_NOT_CONFIGURED: 'Chưa cấu hình dịch vụ gửi thông báo',
+  'messaging/registration-token-not-registered': 'Thiết bị đã hủy đăng ký nhận thông báo',
+  'messaging/invalid-registration-token': 'Mã nhận thông báo không hợp lệ',
+  'messaging/invalid-argument': 'Thông tin gửi thông báo không hợp lệ',
+  'messaging/authentication-error': 'Dịch vụ thông báo từ chối xác thực',
+  'messaging/third-party-auth-error': 'Dịch vụ thông báo gặp lỗi xác thực',
+  'messaging/internal-error': 'Dịch vụ thông báo gặp lỗi nội bộ',
+  'messaging/server-unavailable': 'Dịch vụ thông báo tạm thời không khả dụng',
+  'messaging/message-rate-exceeded': 'Gửi thông báo quá nhanh, vui lòng thử lại',
+  'messaging/device-message-rate-exceeded': 'Thiết bị nhận quá nhiều thông báo',
+};
+
+function notificationErrorLabel(error: string | null): string {
+  if (!error) return 'Không rõ nguyên nhân';
+  if (NOTIFICATION_ERROR_LABEL[error]) return NOTIFICATION_ERROR_LABEL[error];
+  if (error.startsWith('messaging/')) {
+    return 'Dịch vụ thông báo gặp lỗi. Kiểm tra cấu hình gửi thông báo.';
+  }
+  return 'Gửi thông báo thất bại. Kiểm tra thiết bị và cấu hình gửi thông báo.';
+}
 
 function formatDateTime(iso: string): string {
   const date = new Date(iso);
@@ -342,9 +382,9 @@ export function Admin() {
               <span className="admin-stat__hint">Đang bật thông báo</span>
             </div>
             <div className="admin-stat admin-stat--danger">
-              <span className="admin-stat__label">Push lỗi</span>
+              <span className="admin-stat__label">Lỗi gửi thông báo</span>
               <strong className="admin-stat__value">{summary.failedNotifications24h}</strong>
-              <span className="admin-stat__hint">Kiểm tra token/cấu hình</span>
+              <span className="admin-stat__hint">Kiểm tra thiết bị/cấu hình</span>
             </div>
           </div>
         ) : (
@@ -445,7 +485,8 @@ export function Admin() {
 
                       <div className="admin-user__footer">
                         <p className="admin-user__meta">
-                          Tạo ngày {formatDateTime(user.createdAt)} · Múi giờ {user.timezone}
+                          Tạo ngày {formatDateTime(user.createdAt)} · Múi giờ{' '}
+                          {formatTimezoneLabel(user.timezone)}
                         </p>
 
                         <div className="admin-user__actions">
@@ -498,7 +539,7 @@ export function Admin() {
         <aside className="admin-dashboard__side">
           <Section
             title="Lỗi gửi thông báo"
-            description="Các lần gửi Web Push thất bại gần đây — giúp phát hiện token hết hiệu lực hoặc cấu hình sai."
+            description="Các lần gửi thông báo đẩy thất bại gần đây — giúp phát hiện thiết bị hết hiệu lực hoặc cấu hình sai."
           >
             {notifications.length === 0 ? (
               <div className="admin-empty">
@@ -510,12 +551,12 @@ export function Admin() {
                 {notifications.map((item) => (
                   <li key={item.id} className="admin-log__row admin-log__row--error">
                     <div className="admin-log__head">
-                      <strong>{KIND_LABEL[item.kind] ?? item.kind}</strong>
+                      <strong>{KIND_LABEL[item.kind] ?? 'Thông báo'}</strong>
                       <time className="admin-log__time" dateTime={item.sentAt}>
                         {formatDateTime(item.sentAt)}
                       </time>
                     </div>
-                    <p className="admin-log__error">{item.error ?? 'Không rõ lỗi'}</p>
+                    <p className="admin-log__error">{notificationErrorLabel(item.error)}</p>
                   </li>
                 ))}
               </ul>
@@ -536,13 +577,14 @@ export function Admin() {
                 {auditLogs.map((item) => (
                   <li key={item.id} className="admin-log__row admin-log__row--audit">
                     <div className="admin-log__head">
-                      <strong>{ACTION_LABEL[item.action] ?? item.action}</strong>
+                      <strong>{ACTION_LABEL[item.action] ?? 'Thao tác khác'}</strong>
                       <time className="admin-log__time" dateTime={item.createdAt}>
                         {formatDateTime(item.createdAt)}
                       </time>
                     </div>
                     <p className="admin-log__actor">
-                      Đối tượng: {item.actorName ?? item.actorPhone ?? 'Không rõ'} · {item.entity}
+                      Đối tượng: {item.actorName ?? item.actorPhone ?? 'Không rõ'} ·{' '}
+                      {ENTITY_LABEL[item.entity] ?? 'Không xác định'}
                     </p>
                   </li>
                 ))}

@@ -97,7 +97,7 @@ export async function enableWebPush(): Promise<PushSetupResult> {
     return { status: 'unsupported', reason: 'Trình duyệt không hỗ trợ thông báo đẩy' };
   }
   if (!(await isSupported().catch(() => false))) {
-    return { status: 'unsupported', reason: 'Trình duyệt không hỗ trợ Web Push' };
+    return { status: 'unsupported', reason: 'Trình duyệt không hỗ trợ thông báo đẩy' };
   }
 
   const permission = await Notification.requestPermission();
@@ -107,15 +107,15 @@ export async function enableWebPush(): Promise<PushSetupResult> {
 
   const registration = await registerServiceWorker();
   if (!registration) {
-    return { status: 'error', reason: 'Không đăng ký được Service Worker' };
+    return { status: 'error', reason: 'Không đăng ký được dịch vụ nhận thông báo của trình duyệt' };
   }
 
   const messaging = messagingInstance();
-  if (!messaging) return { status: 'unconfigured', reason: 'Chưa khởi tạo được Firebase Messaging' };
+  if (!messaging) return { status: 'unconfigured', reason: 'Chưa khởi tạo được dịch vụ thông báo' };
 
   try {
     const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
-    if (!token) return { status: 'error', reason: 'Không lấy được token Web Push' };
+    if (!token) return { status: 'error', reason: 'Không lấy được mã nhận thông báo' };
     await registerDevice({ fcmToken: token, platform: 'web', userAgent: navigator.userAgent.slice(0, 255) });
     try {
       localStorage.setItem(TOKEN_KEY, token);
@@ -124,7 +124,8 @@ export async function enableWebPush(): Promise<PushSetupResult> {
     }
     return { status: 'registered', token };
   } catch (e) {
-    return { status: 'error', reason: (e as Error).message || 'Lỗi lấy token Web Push' };
+    console.warn('Không lấy được mã nhận thông báo:', e);
+    return { status: 'error', reason: 'Không lấy được mã nhận thông báo' };
   }
 }
 

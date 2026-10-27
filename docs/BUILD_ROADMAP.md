@@ -161,7 +161,7 @@ Thứ tự: **M04 → M05 → M03 → M01 → M02 → M06**. Mỗi màn hình: n
 - **Backend**: `models/User.ts`, `middlewares/auth.ts` (chặn tài khoản khóa + `requireAdminMiddleware`), `config/firebase.ts` (disabled/password/revoke/email batch), `services/adminService.ts`, `routes/admin.ts`, mount `/api/v1/admin`, script `src/scripts/grantAdmin.ts` + `npm run admin:grant`.
 - **Web**: route `/admin` + `screens/Admin.tsx`, link trong M08 chỉ khi `role='admin'`, types/endpoints, CSS `.admin-*`, test `admin.test.tsx`.
 - **Tài liệu**: API_SPEC §2.9, DATABASE_PLAN §3.1 + migration 006, BUSINESS_RULES §8, INTERFACE_SPEC (khu vực `/admin`), TEST_PLAN §7.18 (A8–A14), CURRENT_STATE R9.
-- **Kiểm thử**: backend **146/146**, web **161/161**, typecheck/lint sạch, build web OK. **Chưa chạy Firebase thật** cho khóa/mở/đặt lại mật khẩu (test mock) và **chưa mở `/admin` trên trình duyệt thật** — xem TEST_PLAN §7.18.
+- **Kiểm thử**: backend **146/146**, web **164/164**, typecheck/lint sạch, build web OK. **Chưa chạy Firebase thật** cho khóa/mở/đặt lại mật khẩu (test mock) và **chưa mở `/admin` trên trình duyệt thật** — xem TEST_PLAN §7.18.
 - **Không làm**: xóa tài khoản (Q4), phân quyền admin chi tiết hơn (nhiều cấp), xem nội dung y tế.
 
 ## Phụ thuộc giữa các giai đoạn

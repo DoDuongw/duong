@@ -59,6 +59,54 @@ export function todayYmd(timeZone = 'Asia/Ho_Chi_Minh'): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date());
 }
 
+const TIMEZONE_NAME_VI: Record<string, string> = {
+  'Asia/Ho_Chi_Minh': 'Việt Nam',
+  'Asia/Bangkok': 'Thái Lan',
+  'Asia/Singapore': 'Singapore',
+  'Asia/Tokyo': 'Nhật Bản',
+  'Asia/Seoul': 'Hàn Quốc',
+  'Australia/Sydney': 'Sydney',
+  'Europe/London': 'Luân Đôn',
+  'Europe/Paris': 'Paris',
+  'America/New_York': 'New York',
+  'America/Los_Angeles': 'Los Angeles',
+  UTC: 'Giờ quốc tế',
+};
+
+const timezoneLabelCache = new Map<string, string>();
+
+/** Mã múi giờ (Asia/Ho_Chi_Minh) → nhãn tiếng Việt kèm chênh lệch GMT, ví dụ “Việt Nam (GMT+7)”. */
+export function formatTimezoneLabel(timeZone: string): string {
+  const cached = timezoneLabelCache.get(timeZone);
+  if (cached) return cached;
+
+  let label = TIMEZONE_NAME_VI[timeZone];
+  if (!label) {
+    try {
+      label =
+        new Intl.DateTimeFormat('vi-VN', { timeZone, timeZoneName: 'long' })
+          .formatToParts(new Date())
+          .find((part) => part.type === 'timeZoneName')?.value ?? timeZone;
+    } catch {
+      label = timeZone;
+    }
+  }
+
+  let offset = '';
+  try {
+    offset =
+      new Intl.DateTimeFormat('vi-VN', { timeZone, timeZoneName: 'shortOffset' })
+        .formatToParts(new Date())
+        .find((part) => part.type === 'timeZoneName')?.value ?? '';
+  } catch {
+    offset = '';
+  }
+
+  const result = offset && offset !== 'GMT' ? `${label} (${offset})` : label;
+  timezoneLabelCache.set(timeZone, result);
+  return result;
+}
+
 /** Cộng/trừ ngày trên chuỗi yyyy-mm-dd (không lệch múi giờ) */
 export function shiftYmd(ymd: string, days: number): string {
   const [y, m, d] = ymd.split('-').map(Number);

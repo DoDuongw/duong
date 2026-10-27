@@ -425,11 +425,11 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 - `src/scripts/grantAdmin.ts` + `npm run admin:grant -- <email hoặc SĐT>`: cấp admin đầu tiên (không có endpoint tự cấp).
 - `GET/PATCH /users/me` trả thêm `role`.
 
-**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); giao diện quản trị bố cục **hai cột trên màn hình lớn**, thanh tiêu đề có thời điểm cập nhật + **Tải lại**, 8 thẻ số liệu có nhãn ngữ cảnh, tìm kiếm + **Xóa lọc**, thẻ người dùng có avatar/badge trạng thái, lỗi push + nhật ký dạng timeline; types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại).
+**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); giao diện quản trị bố cục **hai cột trên màn hình lớn**, thanh tiêu đề có thời điểm cập nhật + **Tải lại**, 8 thẻ số liệu có nhãn ngữ cảnh, tìm kiếm + **Xóa lọc**, thẻ người dùng có avatar/badge trạng thái, lỗi gửi thông báo + nhật ký dạng timeline; types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại). Mã lỗi gửi thông báo (`no_active_device`…), loại đối tượng/nhật ký và múi giờ được dịch sang nhãn tiếng Việt.
 
 **Kết quả chạy lệnh (đã chạy thật)**:
 - Backend: `npm run lint` (`tsc --noEmit`) sạch; `npm test` **146/146** (9 suite; **+24 test**: 18 `tests/admin.test.ts` + 6 middleware R10–R15).
-- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **161/161** (18 file; **+12**: 8 admin + 3 lối tắt + 1 tải lại); `npm run build` OK (**492,72 kB / gzip 147,69 kB**; CSS 24,32 kB / gzip 4,82 kB).
+- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **164/164** (18 file; **+15**: 10 admin, 3 lối tắt, 2 nhãn múi giờ); `npm run build` OK (**495,26 kB / gzip 148,62 kB**; CSS 24,32 kB / gzip 4,82 kB).
 
 **Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công, nút **Tải lại** gọi lại cả 4 API.
 

@@ -117,7 +117,7 @@ Vite nạp `web/.env` tự động — **sửa `.env` xong phải dừng/chạy 
 
 ```bash
 npm run typecheck   # TypeScript strict
-npm test            # 161 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, quản trị /admin, push/messaging, SĐT/đăng nhập)
+npm test            # 164 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, quản trị /admin, push/messaging, SĐT/đăng nhập)
 npm run lint        # oxlint
 ```
 

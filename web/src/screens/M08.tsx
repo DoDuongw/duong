@@ -6,6 +6,7 @@ import { Section } from '../components/Section';
 import { Text } from '../components/Text';
 import { useAuth } from '../store/authContext';
 import { applyFontScale, FONT_SCALE_LABEL, readFontScale, type FontScale } from '../utils/fontScale';
+import { formatTimezoneLabel } from '../utils/dateTime';
 import { isSoundEnabled, setSoundEnabled } from '../utils/sound';
 import { isSpeechEnabled, setSpeechEnabled, speechSupported } from '../utils/speech';
 import { isValidAddress, isValidPhone, phoneFromInternalEmail } from '../utils/phone';
@@ -320,7 +321,7 @@ export function M08() {
             >
               {tzOptions.map((tz) => (
                 <option key={tz} value={tz}>
-                  {tz}
+                  {formatTimezoneLabel(tz)}
                 </option>
               ))}
             </select>
