@@ -105,7 +105,7 @@ Giao diện luồng này đơn giản (email + mật khẩu, chữ lớn), dùng
 | Hạng mục | Nội dung |
 |---|---|
 | Mục tiêu | Tài khoản, tùy chỉnh, đăng xuất |
-| Thành phần | Email (đã xác thực); tên hiển thị; múi giờ; cỡ chữ (nhỏ/vừa/lớn); âm thanh; giọng đọc hướng dẫn (Web Speech API — ẩn nếu trình duyệt không hỗ trợ); cài đặt nhắc lại (số phút 5–30, số lần 1–5 — backend tuân theo); cấu hình thông báo cho người thân (bật/tắt `relative_alerts` theo từng kết nối); trạng thái quyền Notifications + hướng dẫn cấp quyền / “Thêm vào màn hình chính” (iOS); **liên kết “Quản trị hệ thống” (chỉ hiện khi `role='admin'`)**; đăng xuất |
+| Thành phần | Email (đã xác thực); tên hiển thị; múi giờ; cỡ chữ (nhỏ/vừa/lớn); âm thanh; giọng đọc hướng dẫn (Web Speech API — ẩn nếu trình duyệt không hỗ trợ); cài đặt nhắc lại (số phút 5–30, số lần 1–5 — backend tuân theo); cấu hình thông báo cho người thân (bật/tắt `relative_alerts` theo từng kết nối); trạng thái quyền Notifications + hướng dẫn cấp quyền / “Thêm vào màn hình chính” (iOS); đăng xuất. **Không chứa lối vào quản trị** (đã chuyển thành nút cố định ngoài M08) |
 | API | `PATCH /users/me`, `PATCH /users/me/notification-settings`, `DELETE /users/devices/unregister` |
 | Kiểm tra trình duyệt | Giọng đọc: kiểm tra `speechSynthesis` trước khi hiển thị; quyền Notifications: hiển thị trạng thái thật; không lưu mật khẩu dạng văn bản |
 | Hành động | Đăng xuất → xác nhận → hủy token thiết bị, xóa phiên local, về luồng đăng nhập |
@@ -119,7 +119,7 @@ Khu vực hậu trường cho tài khoản `role='admin'`, giao diện riêng (k
 | Hạng mục | Nội dung |
 |---|---|
 | Mục tiêu | Theo dõi hoạt động hệ thống, khóa/mở tài khoản, đặt lại mật khẩu cho người quên mật khẩu (đặc biệt tài khoản SĐT dùng email nội bộ) |
-| Điều kiện vào | `profile.role='admin'`; người thường thấy thông báo “không có quyền” + link về trang chủ, **không gọi API quản trị** |
+| Điều kiện vào | `profile.role='admin'`; người thường thấy thông báo “không có quyền” + link về trang chủ, **không gọi API quản trị**. Lối vào là **nút “Quản trị hệ thống” cố định ở đầu trang**, hiện trên mọi màn hình ứng dụng (không nằm trong M08); nút tự ẩn khi đang ở `/admin` |
 | Thành phần | Tiêu đề + nút “← Về ứng dụng”; 8 thẻ số liệu 24 giờ (người dùng, tài khoản khóa, thuốc đang dùng, liều, chưa xác nhận, kết nối người thân, thiết bị, push lỗi); ô tìm theo tên/SĐT; danh sách người dùng dạng thẻ (tên, SĐT, email, badge Quản trị/Đã khóa, 4 số đếm, ngày tạo, múi giờ); phân trang; mục lỗi gửi thông báo; nhật ký thao tác |
 | Hành động | “Khóa tài khoản”/“Mở khóa tài khoản” → hộp thoại xác nhận; “Đặt lại mật khẩu” → hộp thoại nhập mật khẩu mới + nhập lại (≥ 8 ký tự, kiểm tra khớp) |
 | API | `GET /admin/summary`, `GET /admin/users`, `PATCH /admin/users/:id/status`, `POST /admin/users/:id/reset-password`, `GET /admin/notifications`, `GET /admin/audit-logs` |

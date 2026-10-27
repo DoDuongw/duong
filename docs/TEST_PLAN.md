@@ -425,11 +425,11 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 - `src/scripts/grantAdmin.ts` + `npm run admin:grant -- <email hoặc SĐT>`: cấp admin đầu tiên (không có endpoint tự cấp).
 - `GET/PATCH /users/me` trả thêm `role`.
 
-**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; M08 hiện liên kết “Quản trị hệ thống” **chỉ khi** `profile.role='admin'`; types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại).
+**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại).
 
 **Kết quả chạy lệnh (đã chạy thật)**:
 - Backend: `npm run lint` (`tsc --noEmit`) sạch; `npm test` **146/146** (9 suite; **+24 test**: 18 `tests/admin.test.ts` + 6 middleware R10–R15).
-- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **157/157** (18 file; **+8** `admin.test.tsx`); `npm run build` OK (**488,94 kB / gzip 147,00 kB**; CSS 17,27 kB / gzip 3,68 kB).
+- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **160/160** (18 file; **+11**: 8 admin + 3 lối tắt quản trị); `npm run build` OK (**489,03 kB / gzip 147,05 kB**; CSS 17,69 kB / gzip 3,73 kB).
 
 **Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công.
 
@@ -444,7 +444,7 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 
 | Bước | Thao tác | Kết quả mong đợi |
 |---|---|---|
-| A8 | Trong `backend/`, chạy `npm run admin:grant -- <email hoặc SĐT của bạn>` | In “Đã cấp quyền admin…”; M08 xuất hiện mục “Quản trị hệ thống” |
+| A8 | Trong `backend/`, chạy `npm run admin:grant -- <email hoặc SĐT của bạn>` | In “Đã cấp quyền admin…”; tải lại web thấy nút “Quản trị hệ thống” ở đầu trang (không cần vào M08) |
 | A9 | Đăng nhập tài khoản **thường**, mở thẳng `/admin` | Thấy “Tài khoản của bạn không có quyền truy cập…”, không có số liệu; API admin trả 403 |
 | A10 | Admin mở `/admin` | Thấy 8 thẻ số liệu, danh sách người dùng, mục lỗi push, nhật ký; **không** thấy tên thuốc/lý do không uống |
 | A11 | Tìm theo tên và SĐT; bấm trang sau | Kết quả lọc đúng; phân trang đúng, không tải lại toàn trang |

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Admin } from '../screens/Admin';
+import { AdminShortcut } from '../components/AdminShortcut';
 import { AuthContext, type AuthContextValue } from '../store/authContext';
 import type { AdminSummary, AdminUserItem, AdminUserPage, UserProfile } from '../types';
 
@@ -88,6 +89,16 @@ function renderAdmin(auth: AuthContextValue = authValue()) {
     <MemoryRouter initialEntries={['/admin']}>
       <AuthContext.Provider value={auth}>
         <Admin />
+      </AuthContext.Provider>
+    </MemoryRouter>,
+  );
+}
+
+function renderShortcut(role: 'user' | 'admin', path = '/') {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AuthContext.Provider value={authValue(role)}>
+        <AdminShortcut />
       </AuthContext.Provider>
     </MemoryRouter>,
   );
@@ -224,5 +235,26 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
     expect(await screen.findByText(/Đã đặt lại mật khẩu cho Bà Lan/)).toBeInTheDocument();
     expect(screen.getByText(/kênh riêng/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Lối tắt quản trị ngoài M08', () => {
+  it('admin thấy nút “Quản trị hệ thống” trên màn hình ứng dụng', () => {
+    renderShortcut('admin');
+
+    const link = screen.getByRole('link', { name: 'Quản trị hệ thống' });
+    expect(link).toHaveAttribute('href', '/admin');
+  });
+
+  it('người dùng thường không thấy lối tắt quản trị', () => {
+    renderShortcut('user');
+
+    expect(screen.queryByRole('link', { name: 'Quản trị hệ thống' })).not.toBeInTheDocument();
+  });
+
+  it('không lặp lối tắt khi đang ở chính trang /admin', () => {
+    renderShortcut('admin', '/admin');
+
+    expect(screen.queryByRole('link', { name: 'Quản trị hệ thống' })).not.toBeInTheDocument();
   });
 });

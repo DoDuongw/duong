@@ -259,6 +259,43 @@ a {
   }
 }
 
+/* ---------- Lối tắt quản trị (chỉ tài khoản admin) ---------- */
+
+.admin-shortcut {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.admin-shortcut__inner {
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 16px;
+}
+
+.admin-shortcut__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--c-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: calc(15px * var(--font-mult));
+  text-decoration: none;
+  box-shadow: var(--shadow-1);
+}
+
+.admin-shortcut__link:hover {
+  background: var(--c-primary-dark);
+}
+
 /* ---------- Trạng thái tải ---------- */
 
 .spinner {
@@ -1039,14 +1076,6 @@ a {
 
 .admin-back:hover {
   border-color: var(--c-primary);
-}
-
-.admin-entry {
-  display: inline-flex;
-  align-items: center;
-  min-height: 56px;
-  font-weight: 600;
-  font-size: calc(18px * var(--font-mult));
 }
 
 .admin-search {

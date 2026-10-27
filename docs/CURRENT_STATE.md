@@ -9,7 +9,7 @@ Ngày kiểm tra: 19/10/2026
 | Thư mục dự án `D:\duong` | Trống trước khi bắt đầu (ngoài `docs/` do Giai đoạn PLAN tạo) |
 | Backend hiện có | Không |
 | Mobile hiện có | Đã gỡ — `mobile/` (React Native + native android/ios) xóa ngày 19/10/2026 theo quyết định chuyển sang website |
-| Web hiện có | Đã nối API thật + Web Push + cài đặt M08 (20/10/2026) — `web/` (React + Vite + TypeScript + PWA): điều hướng, M01–M08, đăng nhập Firebase, đăng ký Web Push (FCM), banner nhắc trong trang, tài khoản/múi giờ/nhắc lại/thông báo người thân; **khu vực quản trị `/admin` (R9)**: 157 test (Vitest) |
+| Web hiện có | Đã nối API thật + Web Push + cài đặt M08 (20/10/2026) — `web/` (React + Vite + TypeScript + PWA): điều hướng, M01–M08, đăng nhập Firebase, đăng ký Web Push (FCM), banner nhắc trong trang, tài khoản/múi giờ/nhắc lại/thông báo người thân; **khu vực quản trị `/admin` (R9)**: 160 test (Vitest) |
 | Backend hiện có | Đã xong nghiệp vụ + thông báo (20/10/2026) — `backend/` (Express + TypeScript + Mongoose + MongoDB): API thuốc/lịch/lần uống/lịch sử/người thân, dịch vụ sinh lần uống, máy trạng thái, cron, dịch vụ Web Push + phân quyền người thân + thông báo người thân; **API quản trị (R9)**: 146 test (Jest) |
 | package.json | Không (thư mục gốc) — chạy lệnh trong `backend/` hoặc `web/` |
 | Firebase (Auth Email/Mật khẩu, FCM Web Push, credentials) | **Auth Email/Mật khẩu đã bật và chạy thật** (dự án `medicationreminder-6177c`); credentials Admin ở `backend/.env` + `serviceAccountKey.json`; web config ở `web/.env`. **Web Push: code đã xong (Giai đoạn 5)** và **VAPID key đã tạo** (`VITE_FIREBASE_VAPID_KEY` trong `web/.env`, 20/10/2026) — còn chờ thao tác gửi/nhận push thật trên trình duyệt (Giai đoạn 7) |
@@ -365,9 +365,9 @@ Luật hiển thị cảnh báo **khớp chính xác** luật gửi push ở bac
 | `routes/users.ts` | `GET/PATCH /users/me` trả thêm `role` |
 | `src/scripts/grantAdmin.ts` + `package.json` | `npm run admin:grant -- <email hoặc SĐT>` cấp admin đầu tiên; không có endpoint tự cấp |
 
-**Web**: route `/admin` + layout riêng (không tab bar) trong `App.tsx`; `screens/Admin.tsx` (8 thẻ số liệu, tìm kiếm, thẻ người dùng, phân trang, lỗi push, nhật ký, hộp thoại khóa/đặt lại mật khẩu); M08 hiện liên kết **chỉ khi** `profile.role='admin'`; thêm types/endpoints admin; CSS `.admin-*` dùng token y tế.
+**Web**: route `/admin` + layout riêng (không tab bar) trong `App.tsx`; `screens/Admin.tsx` (8 thẻ số liệu, tìm kiếm, thẻ người dùng, phân trang, lỗi push, nhật ký, hộp thoại khóa/đặt lại mật khẩu); **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); thêm types/endpoints admin; CSS `.admin-*` dùng token y tế.
 
-**Kiểm chứng**: backend `tsc --noEmit` sạch + **146/146** test (9 suite; +24: 18 admin + 6 middleware R10–R15); web `tsc -b` sạch + oxlint sạch + **157/157** test (18 file; +8 admin) + build OK (**488,94 kB / gzip 147,00 kB**).
+**Kiểm chứng**: backend `tsc --noEmit` sạch + **146/146** test (9 suite; +24: 18 admin + 6 middleware R10–R15); web `tsc -b` sạch + oxlint sạch + **160/160** test (18 file; +11: 8 admin + 3 lối tắt) + build OK (**489,03 kB / gzip 147,05 kB**).
 
 **Chưa kiểm thử (ghi rõ, không đánh dấu đạt)**: (1) chưa mở `/admin` trên trình duyệt thật; (2) các lời gọi **Firebase thật** cho khóa/mở/đặt lại mật khẩu/lấy email đang được **mock** trong test — cần chạy với service account thật; (3) chưa kiểm tra token cũ bị chặn 403 ngay và đăng nhập lại bị Firebase chặn; (4) chưa thử đặt lại mật khẩu tài khoản SĐT rồi đăng nhập lại. Kịch bản tay A8–A14 ở `TEST_PLAN.md` §7.18.
 

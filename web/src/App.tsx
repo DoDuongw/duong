@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import { Banner } from './components/Banner';
 import { DueBanner } from './components/DueBanner';
 import { TabBar } from './components/TabBar';
+import { AdminShortcut } from './components/AdminShortcut';
 import { useHealth } from './hooks/useHealth';
 import { M01 } from './screens/M01';
 import { M02 } from './screens/M02';
@@ -44,6 +45,7 @@ function Shell({ children, showTabs = true }: { children: ReactNode; showTabs?: 
     <div className="app-shell">
       <Banner online={online} />
       {showTabs && <TabBar />}
+      <AdminShortcut />
       <main className={showTabs ? 'page' : 'page page--task'}>{children}</main>
       <DueBanner />
     </div>

@@ -51,7 +51,7 @@ Khu vực hậu trường **ngoài M01–M08** (không phải màn hình M09). C
   npm run admin:grant -- ban@example.com   # hoặc: npm run admin:grant -- 0912345678
   ```
 
-  Sau đó tải lại web → M08 có mục “Quản trị hệ thống”, hoặc mở thẳng `/admin`.
+  Sau đó tải lại web → nút “Quản trị hệ thống” hiện cố định ở đầu trang (không cần vào Cài đặt), hoặc mở thẳng `/admin`.
 - **Chức năng**: xem số liệu 24 giờ, tìm/phân trang người dùng, xem lỗi gửi push + nhật ký thao tác, **khóa/mở tài khoản**, **đặt lại mật khẩu**. Không hiển thị tên thuốc/lý do không uống.
 - **Khóa tài khoản** có hiệu lực ngay với API (backend kiểm tra `users.disabled_at`) và chặn đăng nhập lại qua Firebase. **Đặt lại mật khẩu** cần Firebase Admin đã cấu hình trong `backend/.env` (dùng cho tài khoản SĐT vì không nhận được email đặt lại).
 - **Chưa có xóa tài khoản** — chờ quyết định Q4 về lưu trữ/xóa dữ liệu (`docs/OPEN_QUESTIONS.md`).
@@ -117,13 +117,13 @@ Vite nạp `web/.env` tự động — **sửa `.env` xong phải dừng/chạy 
 
 ```bash
 npm run typecheck   # TypeScript strict
-npm test            # 157 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, quản trị /admin, push/messaging, SĐT/đăng nhập)
+npm test            # 160 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, quản trị /admin, push/messaging, SĐT/đăng nhập)
 npm run lint        # oxlint
 ```
 
 ### Màn hình và điều hướng
 
-Đúng 8 màn hình M01–M08 trong `src/screens/` + luồng đăng nhập Email/Mật khẩu (`src/screens/Login/`), không thêm màn hình thứ 9. **Khu vực quản trị `/admin` là công cụ hậu trường ngoài M01–M08** (không phải M09), chỉ tài khoản `role='admin'` thấy.
+Đúng 8 màn hình M01–M08 trong `src/screens/` + luồng đăng nhập Email/Mật khẩu (`src/screens/Login/`), không thêm màn hình thứ 9. **Khu vực quản trị `/admin` là công cụ hậu trường ngoài M01–M08** (không phải M09), chỉ tài khoản `role='admin'` thấy. Admin có **nút “Quản trị hệ thống” cố định ở đầu trang** (không nằm trong M08).
 
 - **Responsive mobile-first**: bottom tab bar ở viewport điện thoại (nút to, có nhãn chữ) cho 5 màn hình chính (M01, M03, M04, M06, M08); màn tác vụ tập trung (M02, M05, M07, Login) và `/admin` không hiện tab. Màn hình lớn chuyển nav ngang.
 - **Quản trị**: `/admin` có số liệu 24 giờ, danh sách người dùng (tìm/phân trang, số đếm — không nội dung y tế), lỗi gửi push, nhật ký; khóa/mở tài khoản + đặt lại mật khẩu. Cấp admin bằng `npm run admin:grant` (mục Backend ở trên).
