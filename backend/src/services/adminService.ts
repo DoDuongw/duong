@@ -14,6 +14,7 @@ import {
   setFirebaseUserPassword,
 } from '../config/firebase';
 import { badRequest, notFound, serviceUnavailable } from '../utils/errors';
+import { notificationErrorLabel } from '../utils/notificationLabels';
 
 /**
  * Dịch vụ quản trị (chỉ đọc + khóa/mở + đặt lại mật khẩu).
@@ -191,7 +192,10 @@ export interface AdminFailedNotification {
   kind: string;
   channel: string;
   sentAt: string;
-  error: string | null;
+  /** Nhãn tiếng Việt để hiển thị. */
+  error: string;
+  /** Mã gốc trong notification_logs — giữ lại để tra cứu kỹ thuật. */
+  errorCode: string | null;
   doseId: string;
 }
 
@@ -207,7 +211,8 @@ export async function listFailedNotifications(limit = 20): Promise<AdminFailedNo
     kind: d.kind,
     channel: d.channel,
     sentAt: d.sent_at.toISOString(),
-    error: d.error,
+    error: notificationErrorLabel(d.error),
+    errorCode: d.error,
     doseId: String(d.dose_id),
   }));
 }

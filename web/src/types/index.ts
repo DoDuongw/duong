@@ -187,7 +187,10 @@ export interface AdminFailedNotification {
   kind: string;
   channel: string;
   sentAt: string;
-  error: string | null;
+  /** Nhãn tiếng Việt do API trả về. */
+  error: string;
+  /** Mã gốc trong notification_logs — dùng để đối chiếu kỹ thuật. */
+  errorCode: string | null;
   doseId: string;
 }
 

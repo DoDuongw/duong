@@ -351,14 +351,18 @@ describe('Log vận hành', () => {
       kind: 'relative_alert',
       sent_at: new Date(),
       status: 'failed',
-      error: 'token không còn hiệu lực',
+      error: 'no_active_device',
     });
 
     const res = await request(app).get('/api/v1/admin/notifications').set(as(owner.id));
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
-    expect(res.body.data[0]).toMatchObject({ kind: 'relative_alert', error: 'token không còn hiệu lực' });
+    expect(res.body.data[0]).toMatchObject({
+      kind: 'relative_alert',
+      error: 'Thiết bị hiện không hoạt động',
+      errorCode: 'no_active_device',
+    });
   });
 
   test('GET /admin/audit-logs trả tên người thao tác', async () => {

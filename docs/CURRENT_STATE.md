@@ -361,13 +361,13 @@ Luật hiển thị cảnh báo **khớp chính xác** luật gửi push ở bac
 | `models/User.ts` | `role: 'user'\|'admin'` (mặc định `user`), `disabled_at: Date\|null` |
 | `middlewares/auth.ts` | `authMiddleware` chặn tài khoản bị khóa bằng **403** trước khi gắn `req.user`; gắn `isAdmin`; thêm `requireAdminMiddleware` |
 | `config/firebase.ts` | `setFirebaseUserDisabled`, `setFirebaseUserPassword`, `revokeFirebaseRefreshTokens`, `getFirebaseUserEmails` (1 lần/trang), `getFirebaseUserByEmail`, `isFirebaseReady` |
-| `services/adminService.ts`, `routes/admin.ts` | Summary 24h; danh sách người dùng (tìm/phân trang, số đếm; **không** nội dung y tế); lỗi push; nhật ký; khóa/mở; đặt lại mật khẩu. Mọi thao tác ghi `audit_logs`, **không ghi mật khẩu** |
+| `services/adminService.ts`, `routes/admin.ts` | Summary 24h; danh sách người dùng (tìm/phân trang, số đếm; **không** nội dung y tế); lỗi gửi thông báo (`error` = nhãn tiếng Việt, `errorCode` = mã gốc); nhật ký; khóa/mở; đặt lại mật khẩu. Mọi thao tác ghi `audit_logs`, **không ghi mật khẩu** |
 | `routes/users.ts` | `GET/PATCH /users/me` trả thêm `role` |
 | `src/scripts/grantAdmin.ts` + `package.json` | `npm run admin:grant -- <email hoặc SĐT>` cấp admin đầu tiên; không có endpoint tự cấp |
 
 **Web**: route `/admin` + layout riêng (không tab bar) trong `App.tsx`; `screens/Admin.tsx` (thanh tiêu đề có thời điểm cập nhật + “Tải lại”, tổng quan 8 thẻ số liệu, bố cục hai cột trên màn hình lớn, tìm kiếm + “Xóa lọc”, thẻ người dùng có avatar/badge trạng thái, phân trang, lỗi gửi thông báo, nhật ký, hộp thoại khóa/đặt lại mật khẩu); **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); thêm types/endpoints admin; CSS `.admin-*` dùng token y tế. Mã lỗi gửi thông báo, loại đối tượng/nhật ký và múi giờ được hiển thị bằng **nhãn tiếng Việt** (`no_active_device` → “Thiết bị hiện không hoạt động”; `Asia/Ho_Chi_Minh` → “Việt Nam (GMT+7)”).
 
-**Kiểm chứng**: backend `tsc --noEmit` sạch + **146/146** test (9 suite; +24: 18 admin + 6 middleware R10–R15); web `tsc -b` sạch + oxlint sạch + **164/164** test (18 file; +15: 10 admin, 3 lối tắt, 2 nhãn múi giờ) + build OK (**495,26 kB / gzip 148,62 kB**; CSS 24,32 kB / gzip 4,82 kB).
+**Kiểm chứng**: backend `tsc --noEmit` sạch + **146/146** test (9 suite; +24: 18 admin + 6 middleware R10–R15); web `tsc -b` sạch + oxlint sạch + **164/164** test (18 file; +15: 10 admin, 3 lối tắt, 2 nhãn múi giờ) + build OK (**495,34 kB / gzip 148,65 kB**; CSS 24,32 kB / gzip 4,82 kB).
 
 **Chưa kiểm thử (ghi rõ, không đánh dấu đạt)**: (1) chưa mở `/admin` trên trình duyệt thật; (2) các lời gọi **Firebase thật** cho khóa/mở/đặt lại mật khẩu/lấy email đang được **mock** trong test — cần chạy với service account thật; (3) chưa kiểm tra token cũ bị chặn 403 ngay và đăng nhập lại bị Firebase chặn; (4) chưa thử đặt lại mật khẩu tài khoản SĐT rồi đăng nhập lại. Kịch bản tay A8–A14 ở `TEST_PLAN.md` §7.18.
 

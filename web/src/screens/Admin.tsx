@@ -75,10 +75,13 @@ const NOTIFICATION_ERROR_LABEL: Record<string, string> = {
   'messaging/device-message-rate-exceeded': 'Thiết bị nhận quá nhiều thông báo',
 };
 
-function notificationErrorLabel(error: string | null): string {
-  if (!error) return 'Không rõ nguyên nhân';
-  if (NOTIFICATION_ERROR_LABEL[error]) return NOTIFICATION_ERROR_LABEL[error];
-  if (error.startsWith('messaging/')) {
+function notificationErrorLabel(item: Pick<AdminFailedNotification, 'error' | 'errorCode'>): string {
+  const code = item.errorCode ?? item.error;
+  if (!code) return 'Không rõ nguyên nhân';
+  if (NOTIFICATION_ERROR_LABEL[code]) return NOTIFICATION_ERROR_LABEL[code];
+  // API mới đã trả nhãn tiếng Việt trong `error`; chỉ dùng mã để tra cứu.
+  if (item.error && (item.error !== code || /\s/.test(item.error))) return item.error;
+  if (code.startsWith('messaging/')) {
     return 'Dịch vụ thông báo gặp lỗi. Kiểm tra cấu hình gửi thông báo.';
   }
   return 'Gửi thông báo thất bại. Kiểm tra thiết bị và cấu hình gửi thông báo.';
@@ -556,7 +559,7 @@ export function Admin() {
                         {formatDateTime(item.sentAt)}
                       </time>
                     </div>
-                    <p className="admin-log__error">{notificationErrorLabel(item.error)}</p>
+                    <p className="admin-log__error">{notificationErrorLabel(item)}</p>
                   </li>
                 ))}
               </ul>

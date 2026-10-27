@@ -421,7 +421,7 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 - `models/User.ts`: `role: 'user'|'admin'` (mặc định `user`), `disabled_at: Date|null`.
 - `middlewares/auth.ts`: chặn tài khoản bị khóa bằng **403** ngay trong `authMiddleware`; gắn `isAdmin`; thêm `requireAdminMiddleware`.
 - `config/firebase.ts`: `setFirebaseUserDisabled`, `setFirebaseUserPassword`, `revokeFirebaseRefreshTokens`, `getFirebaseUserEmails` (1 lần/trang), `getFirebaseUserByEmail`, `isFirebaseReady`.
-- `services/adminService.ts` + `routes/admin.ts` + mount `/api/v1/admin`: summary, danh sách người dùng (tìm/phân trang, **không** nội dung y tế), lỗi push, nhật ký, khóa/mở, đặt lại mật khẩu. Khóa/mở/đặt lại mật khẩu ghi `audit_logs`, không ghi mật khẩu.
+- `services/adminService.ts` + `routes/admin.ts` + mount `/api/v1/admin`: summary, danh sách người dùng (tìm/phân trang, **không** nội dung y tế), lỗi gửi thông báo (`error` = nhãn tiếng Việt, `errorCode` = mã gốc), nhật ký, khóa/mở, đặt lại mật khẩu. Khóa/mở/đặt lại mật khẩu ghi `audit_logs`, không ghi mật khẩu.
 - `src/scripts/grantAdmin.ts` + `npm run admin:grant -- <email hoặc SĐT>`: cấp admin đầu tiên (không có endpoint tự cấp).
 - `GET/PATCH /users/me` trả thêm `role`.
 
@@ -429,9 +429,9 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 
 **Kết quả chạy lệnh (đã chạy thật)**:
 - Backend: `npm run lint` (`tsc --noEmit`) sạch; `npm test` **146/146** (9 suite; **+24 test**: 18 `tests/admin.test.ts` + 6 middleware R10–R15).
-- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **164/164** (18 file; **+15**: 10 admin, 3 lối tắt, 2 nhãn múi giờ); `npm run build` OK (**495,26 kB / gzip 148,62 kB**; CSS 24,32 kB / gzip 4,82 kB).
+- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **164/164** (18 file; **+15**: 10 admin, 3 lối tắt, 2 nhãn múi giờ); `npm run build` OK (**495,34 kB / gzip 148,65 kB**; CSS 24,32 kB / gzip 4,82 kB).
 
-**Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công, nút **Tải lại** gọi lại cả 4 API.
+**Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công, nút **Tải lại** gọi lại cả 4 API; mã lỗi gửi thông báo được trả về dưới dạng **nhãn tiếng Việt** + `errorCode` gốc.
 
 **CHƯA KIỂM THỬ (ghi rõ, không đánh dấu đạt)**:
 1. **Chưa mở `/admin` trên trình duyệt thật**; chưa chạy **A8–A14** dưới đây.

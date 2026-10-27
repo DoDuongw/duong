@@ -144,7 +144,8 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
         kind: 'scheduled_reminder',
         channel: 'fcm',
         sentAt: '2026-10-20T03:00:00.000Z',
-        error: 'no_active_device',
+        error: 'Thiết bị hiện không hoạt động',
+        errorCode: 'no_active_device',
         doseId: 'd1',
       },
     ]);
