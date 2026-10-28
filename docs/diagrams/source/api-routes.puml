@@ -1,0 +1,52 @@
+@startuml
+title API route inventory (reviewed from source and API spec)
+left to right direction
+skinparam shadowing false
+package "users" {
+ usecase "POST /users/me/sync" as U1
+ usecase "GET /users/me" as U2
+ usecase "PATCH /users/me" as U3
+ usecase "PATCH /users/me/notification-settings" as U4
+ usecase "POST /users/devices/register" as U5
+ usecase "DELETE /users/devices/unregister" as U6
+}
+package "medications" {
+ usecase "GET /medications" as M1
+ usecase "POST /medications" as M2
+ usecase "GET /medications/:id" as M3
+ usecase "PATCH /medications/:id" as M4
+ usecase "POST /medications/:id/discontinue" as M5
+ usecase "POST /medications/:id/schedules" as M6
+ usecase "PUT /medications/schedules/:id" as M7
+ usecase "DELETE /medications/schedules/:id" as M8
+}
+package "doses" {
+ usecase "GET /doses/today" as D1
+ usecase "GET /doses?date=" as D2
+ usecase "GET /doses/:id" as D3
+ usecase "POST /doses/:id/confirm" as D4
+ usecase "POST /doses/:id/snooze" as D5
+ usecase "POST /doses/:id/cannot-take" as D6
+}
+package "history" { usecase "GET /history" as H1 }
+package "family" {
+ usecase "POST /family/invites" as F1
+ usecase "POST /family/invites/:code/accept" as F2
+ usecase "GET /family/connections" as F3
+ usecase "PATCH /family/connections/:id/permissions" as F4
+ usecase "DELETE /family/connections/:id" as F5
+}
+package "admin" {
+ usecase "GET /admin/summary" as A1
+ usecase "GET /admin/users" as A2
+ usecase "PATCH /admin/users/:id/status" as A3
+ usecase "POST /admin/users/:id/reset-password" as A4
+ usecase "PATCH /admin/users/:id/role" as A5
+ usecase "GET /admin/notifications" as A6
+ usecase "GET /admin/audit-logs" as A7
+}
+note bottom
+Inventory reviewed against API_SPEC and route source.
+Routes are mounted under /api/v1; health endpoint is defined separately.
+end note
+@enduml
