@@ -1,0 +1,52 @@
+@startuml
+title Ung dung nhac lich uong thuoc va theo doi suc khoe nguoi cao tuoi
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+actor "Nguoi cao tuoi (chu ho so)" as Elder
+actor "Nguoi than" as Family
+actor "Quan ly van hanh" as Manager
+actor "Quan tri he thong" as Admin
+rectangle "He thong MedReminder" {
+ usecase "Dang nhap" as Login
+ usecase "Xem trang chu M01" as Home
+ usecase "Xem lich uong thuoc M03" as Schedule
+ usecase "Xem danh sach thuoc M04" as Meds
+ usecase "Them / sua thuoc M05" as EditMed
+ usecase "Xac nhan da uong" as Confirm
+ usecase "Nhan thong bao nhac thuoc" as Notify
+ usecase "Xem lich su va suc khoe" as History
+ usecase "Quan ly ket noi nguoi than" as Connections
+ usecase "Xem so lieu van hanh" as Ops
+ usecase "Khoa / mo tai khoan" as Disable
+ usecase "Dat lai mat khau / doi vai tro" as AdminOps
+}
+Elder --> Login
+Elder --> Home
+Elder --> Schedule
+Elder --> Meds
+Elder --> EditMed
+Elder --> Confirm
+Elder --> Notify
+Elder --> History
+Elder --> Connections
+Family --> Login
+Family --> Schedule
+Family --> Meds
+Family --> History
+Family --> Notify
+Manager --> Login
+Manager --> Ops
+Manager --> Disable
+Admin --> Login
+Admin --> Ops
+Admin --> Disable
+Admin --> AdminOps
+note right of Family
+Nguoi than can ket noi dang hoat dong va quyen phu hop.
+Theo API spec, chi chu ho so duoc xac nhan da uong.
+end note
+note bottom of Notify
+Backend node-cron gui Web Push qua Firebase Cloud Messaging.
+end note
+@enduml
