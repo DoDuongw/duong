@@ -18,6 +18,7 @@ import type {
   TodayDoses,
   UserPreferences,
   UserProfile,
+  UserRole,
 } from '../types';
 
 /** Sinh id chống trùng cho xác nhận (idempotency) — ưu tiên crypto.randomUUID */
@@ -232,6 +233,10 @@ export function setAdminUserDisabled(id: string, disabled: boolean): Promise<{ i
 
 export function adminResetPassword(id: string, password: string): Promise<{ id: string; reset: true }> {
   return apiFetch(`/admin/users/${id}/reset-password`, { method: 'POST', body: { password } });
+}
+
+export function setAdminUserRole(id: string, role: UserRole): Promise<{ id: string; role: UserRole }> {
+  return apiFetch(`/admin/users/${id}/role`, { method: 'PATCH', body: { role } });
 }
 
 export function getAdminNotifications(limit = 20): Promise<AdminFailedNotification[]> {

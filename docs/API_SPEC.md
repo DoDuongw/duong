@@ -35,7 +35,8 @@
 |---|---|
 | Chủ hồ sơ | Token UID khớp `user_id` của tài nguyên |
 | Người thân | UID có `family_connections` active với owner và `permissions.view_schedule=true` (xem) hoặc `manage_medication=true` (sửa — mở rộng) |
-| Admin hệ thống | `users.role = 'admin'` — chỉ dùng cho khu vực `/api/v1/admin` (không đọc nội dung y tế chi tiết) |
+| Quản lý vận hành | `users.role = 'manager'` — xem số liệu/danh sách, khóa/mở tài khoản người dùng; **không** đặt lại mật khẩu, không đổi vai trò, không đọc nội dung y tế chi tiết |
+| Quản trị hệ thống | `users.role = 'admin'` — toàn bộ khu vực `/api/v1/admin`, gồm đặt lại mật khẩu và đổi vai trò; không đọc nội dung y tế chi tiết |
 
 ## 2. Bảng endpoint
 
@@ -50,7 +51,7 @@
 | Method | Path | Quyền | Input | Output |
 |---|---|---|---|---|
 | POST | /users/me/sync | Đã đăng nhập Firebase | `{ displayName?, phone?, address?, timezone?, preferences? }` | Tạo/cập nhật bản ghi user theo firebase_uid (idempotent). `phone` chuẩn hoá `0xxxxxxxxx` (nhận `+84…`); `phone`/`address` rỗng = null |
-| GET | /users/me | Chủ hồ sơ | — | `{ id, phone, displayName, address, timezone, preferences, role }` (`role`: `'user' \| 'admin'`) |
+| GET | /users/me | Chủ hồ sơ | — | `{ id, phone, displayName, address, timezone, preferences, role }` (`role`: `'user' \| 'manager' \| 'admin'`) |
 | PATCH | /users/me | Chủ hồ sơ | `{ displayName?, phone?, address?, timezone?, preferences? }` | Cập nhật tùy chọn M08. `phone` sai định dạng → 400; `phone`/`address` = `""`/`null` để xoá |
 
 ### 2.3 Thuốc
@@ -109,22 +110,32 @@
 
 > Ghi chú: route thiết bị nằm dưới `/users` (mount tại `/api/v1/users`) — đường dẫn đầy đủ là `/api/v1/users/devices/register` và `/api/v1/users/devices/unregister`.
 
-### 2.9 Quản trị hệ thống — chỉ `users.role = 'admin'`
+### 2.9 Khu vực vận hành — `manager` và `admin`
 
-Khu vực hậu trường `/admin` (không phải màn hình M09). Mọi route dưới đây đều qua `requireAuthMiddleware` + `requireAdminMiddleware`; người dùng thường nhận **403 FORBIDDEN**, chưa đăng nhập nhận **401 UNAUTHENTICATED**.
+Khu vực hậu trường `/admin` (không phải màn hình M09). Mọi route dưới đây qua `requireAuthMiddleware` + `requireStaffMiddleware` (`manager` hoặc `admin`); người dùng thường nhận **403 FORBIDDEN**, chưa đăng nhập nhận **401 UNAUTHENTICATED**. Đặt lại mật khẩu và đổi vai trò qua thêm `requireAdminMiddleware` — `manager` gọi hai route này nhận **403**.
 
 | Method | Path | Quyền | Input | Output |
 |---|---|---|---|---|
-| GET | /admin/summary | Admin | — | `{ users, disabledUsers, activeMedications, doses24h, confirmed24h, activeConnections, activeDevices, failedNotifications24h }` — chỉ số đếm; các số `24h` chỉ tính **24 giờ đã qua** (không gồm liều tương lai) |
-| GET | /admin/users | Admin | Query: `?q=&page=&pageSize=` (`pageSize` ≤ 50) | `{ items: [{ id, displayName, phone, email, role, disabled, timezone, createdAt, medicationsActive, doses7d, confirmed7d, devicesActive }], page, pageSize, total }`. Tìm theo tên/SĐT. **Không** trả tên thuốc, ghi chú, lý do không uống. `email` đọc một lần từ Firebase Admin (không lưu trong MongoDB); Firebase lỗi → `email = null`, trang vẫn hoạt động |
-| PATCH | /admin/users/:id/status | Admin | `{ disabled: boolean }` | Khóa/mở tài khoản: gọi Firebase `updateUser(uid, { disabled })`, thu hồi refresh token khi khóa, lưu `users.disabled_at`, ghi `audit_logs` (`admin_lock`/`admin_unlock`). Không thể tự khóa chính mình → 400 |
-| POST | /admin/users/:id/reset-password | Admin | `{ password }` (8–128 ký tự) | Đặt mật khẩu qua Firebase Admin (cần cho tài khoản SĐT dùng email nội bộ, không nhận được email đặt lại), thu hồi refresh token, ghi `audit_logs` (`admin_reset_password`). **Không** trả/ghi lại mật khẩu |
-| GET | /admin/notifications | Admin | Query: `?limit=` (≤ 100, mặc định 20) | Các `notification_logs` có `status='failed'`, mới nhất trước: `{ id, kind, channel, sentAt, error, errorCode, doseId }`; `error` là **nhãn tiếng Việt** để hiển thị, `errorCode` là mã gốc (`no_active_device`, `messaging/...`) để tra cứu |
-| GET | /admin/audit-logs | Admin | Query: `?limit=` (≤ 100, mặc định 20) | Nhật ký thao tác gần đây: `{ id, action, entity, entityId, actorName, actorPhone, createdAt, details }`. `actorName/actorPhone` là tên tài khoản bị tác động; `details.admin_id` là quản trị viên đã thao tác (không trả mật khẩu) |
+| GET | /admin/summary | Manager/Admin | — | `{ users, disabledUsers, activeMedications, doses24h, confirmed24h, activeConnections, activeDevices, failedNotifications24h }` — chỉ số đếm; các số `24h` chỉ tính **24 giờ đã qua** (không gồm liều tương lai) |
+| GET | /admin/users | Manager/Admin | Query: `?q=&page=&pageSize=` (`pageSize` ≤ 50) | `{ items: [{ id, displayName, phone, email, role, disabled, timezone, createdAt, medicationsActive, doses7d, confirmed7d, devicesActive }], page, pageSize, total }`. `role`: `'user' \| 'manager' \| 'admin'`. Tìm theo tên/SĐT. **Không** trả tên thuốc, ghi chú, lý do không uống. `email` đọc một lần từ Firebase Admin (không lưu trong MongoDB); Firebase lỗi → `email = null`, trang vẫn hoạt động |
+| PATCH | /admin/users/:id/status | Manager/Admin | `{ disabled: boolean }` | Khóa/mở tài khoản: gọi Firebase `updateUser(uid, { disabled })`, thu hồi refresh token khi khóa, lưu `users.disabled_at`, ghi `audit_logs` (`admin_lock`/`admin_unlock`). Không thể tự khóa chính mình → 400. **Manager** chỉ thao tác được tài khoản `role='user'`; tài khoản `manager`/`admin` → 403 |
+| POST | /admin/users/:id/reset-password | Admin | `{ password }` (8–128 ký tự) | Đặt mật khẩu qua Firebase Admin (cần cho tài khoản SĐT dùng email nội bộ, không nhận được email đặt lại), thu hồi refresh token, ghi `audit_logs` (`admin_reset_password`). **Không** trả/ghi lại mật khẩu. Manager → 403 |
+| PATCH | /admin/users/:id/role | Admin | `{ role: 'user' \| 'manager' \| 'admin' }` | Đổi vai trò trong MongoDB; ghi `audit_logs` (`admin_set_role`, `details.from/to`). Không thể tự đổi vai trò của mình → 400; không thể hạ quyền admin đang hoạt động cuối cùng → 400. Manager → 403 |
+| GET | /admin/notifications | Manager/Admin | Query: `?limit=` (≤ 100, mặc định 20) | Các `notification_logs` có `status='failed'`, mới nhất trước: `{ id, kind, channel, sentAt, error, errorCode, doseId }`; `error` là **nhãn tiếng Việt** để hiển thị, `errorCode` là mã gốc (`no_active_device`, `messaging/...`) để tra cứu |
+| GET | /admin/audit-logs | Manager/Admin | Query: `?limit=` (≤ 100, mặc định 20) | Nhật ký thao tác gần đây: `{ id, action, entity, entityId, actorName, actorPhone, createdAt, details }`. `actorName/actorPhone` là tên tài khoản bị tác động; `details.admin_id` là tài khoản đã thao tác; `details.admin_role` cho biết `manager`/`admin` (không trả mật khẩu) |
 
 **Khóa tài khoản**: ngoài việc chặn đăng nhập lại ở Firebase, backend kiểm tra `users.disabled_at` ngay trong `authMiddleware` → mọi API (kể cả `/users/me/sync`) trả **403 FORBIDDEN** với thông báo “Tài khoản đã bị khóa…”. Token cũ có hiệu lực tối đa 1 giờ nhưng không dùng được API trong thời gian đó.
 
-**Cấp quyền admin đầu tiên**: chạy `npm run admin:grant -- <email hoặc SĐT>` trong `backend/` (script `src/scripts/grantAdmin.ts`). Script tìm user qua Firebase (email) hoặc `users.phone` (SĐT) rồi đặt `role='admin'`. Không có endpoint tự cấp quyền admin.
+**Cấp/đổi vai trò**: admin có thể đổi trong `/admin` (có audit), hoặc dùng CLI:
+
+```bash
+cd backend
+npm run admin:grant -- ban@example.com                 # mặc định admin
+npm run admin:grant -- 0912345678 --role manager       # cấp quản lý
+npm run role:set -- ban@example.com --role user        # hạ về người dùng
+```
+
+Script tìm user qua Firebase (email) hoặc `users.phone` (SĐT) rồi đặt `role`. Không có endpoint tự cấp quyền. Không thể hạ quyền admin đang hoạt động cuối cùng.
 
 **Firebase Admin chưa cấu hình** → khóa/mở và đặt lại mật khẩu trả **503 SERVICE_UNAVAILABLE**; các route chỉ đọc vẫn chạy (trừ email = null).
 
@@ -147,14 +158,14 @@ Theo phạm vi đã chốt (PROJECT_PLAN mục 4), nhóm API sức khỏe không
 
 9. **Thông báo người thân (relative alert)**: khi lần uống **chưa được xác nhận quá `RELATIVE_ALERT_AFTER_MINUTES` phút** (mặc định **15**, cấu hình ở `backend/.env`) server gửi Web Push tới thiết bị của mọi người thân có kết nối `active` với `permissions.relative_alerts=true` (mặc định bật). Mốc tính là giờ đến hạn **cuối cùng** (`snoozed_until` nếu đã “nhắc lại sau”). Người thân đã xác nhận hoặc đánh dấu không thể uống → không gửi. Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống chỉ gửi một lần; nếu tới lúc chuyển `missed` (2 giờ) mà chưa từng gửi thì vẫn báo (lưới an toàn). Đây là push phía server, không có endpoint riêng.
 
-10. **Quản trị tối thiểu dữ liệu**: route admin **không** trả nội dung y tế (tên thuốc, hướng dẫn, lý do không uống) và **không** trả token FCM, `firebase_uid` của người khác. Mật khẩu mới do admin nhập chỉ chuyển tới Firebase, **không** lưu DB, không ghi log, không trả lại trong response. Mọi thao tác khóa/mở/đặt lại mật khẩu đều ghi `audit_logs` với `details.admin_id`.
+10. **Quản trị tối thiểu dữ liệu**: route vận hành **không** trả nội dung y tế (tên thuốc, hướng dẫn, lý do không uống) và **không** trả token FCM, `firebase_uid` của người khác. Mật khẩu mới do admin nhập chỉ chuyển tới Firebase, **không** lưu DB, không ghi log, không trả lại trong response. Mọi thao tác khóa/mở/đặt lại mật khẩu/đổi vai trò đều ghi `audit_logs` với `details.admin_id`.
 
 ---
 
 ## Điểm cần duyệt
 
-1. Danh sách endpoint ở mục 2 (bao gồm nhóm quản trị 2.9; nhóm sức khỏe 2.10 loại bỏ).
+1. Danh sách endpoint ở mục 2 (bao gồm nhóm vận hành 2.9; nhóm sức khỏe 2.10 loại bỏ).
 2. Bắt buộc `clientRequestId` cho xác nhận (idempotency).
 3. Người thân chỉ có quyền xem ở MVP; `manage_medication` chỉ mở ở mở rộng.
 4. Rate limit mã mời 5 lần/phút.
-5. **Đã duyệt 20/10/2026**: khu vực quản trị `/admin` ngoài M01–M08 — chỉ đọc + khóa/mở + đặt lại mật khẩu; thêm `users.role` và `users.disabled_at`. **Không** có xóa tài khoản (chờ Q4 — chính sách lưu trữ/xóa dữ liệu).
+5. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: khu vực vận hành `/admin` ngoài M01–M08 — manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đặt lại mật khẩu + đổi vai trò. Thêm `users.role` (`user`/`manager`/`admin`) và `users.disabled_at`. **Không** có xóa tài khoản (chờ Q4 — chính sách lưu trữ/xóa dữ liệu).

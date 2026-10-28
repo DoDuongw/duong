@@ -96,17 +96,20 @@ stateDiagram-v2
 3. Mọi thao tác ghi quan trọng đều ghi `audit_logs` (tạo/sửa/ngừng thuốc, đổi lịch, kết nối/ngắt người thân).
 4. Thông báo “đã gửi” ≠ “đã xác nhận uống” — tách bạch trong dữ liệu và UI.
 
-## 8. Quản trị hệ thống (`/admin`)
+## 8. Khu vực vận hành (`/admin`)
 
 | Quy tắc | Nội dung |
 |---|---|
-| Ai được vào | Chỉ `users.role = 'admin'`. Người dùng thường → 403; chưa đăng nhập → 401. Không có màn hình đăng ký admin |
-| Cấp quyền đầu tiên | Script `npm run admin:grant -- <email hoặc SĐT>` (backend). Không có API tự cấp quyền |
-| Phạm vi dữ liệu | **Chỉ đọc số đếm** + danh sách người dùng (tên, SĐT, email, vai trò, trạng thái khóa, số thuốc/liều/thiết bị). **Không** trả tên thuốc, hướng dẫn, lý do không uống |
-| Khóa tài khoản | Gọi Firebase `disabled=true` + thu hồi refresh token + lưu `disabled_at`; `authMiddleware` chặn **ngay** mọi API bằng 403. Không thể tự khóa chính mình |
+| Ai được vào | `users.role = 'manager'` hoặc `'admin'`. Người dùng thường → 403; chưa đăng nhập → 401. Không có màn hình đăng ký admin |
+| Quyền của quản lý | Xem số liệu/danh sách, khóa/mở **tài khoản người dùng**; không đặt lại mật khẩu, không đổi vai trò, không thao tác tài khoản manager/admin |
+| Quyền của admin | Toàn bộ quyền quản lý + đặt lại mật khẩu + đổi vai trò `user`/`manager`/`admin` |
+| Cấp quyền | Admin đổi trong `/admin` (có audit); CLI: `npm run admin:grant -- <email/SĐT> [--role user\|manager\|admin]` hoặc `npm run role:set -- ...`. Không có API tự cấp quyền |
+| Phạm vi dữ liệu | **Chỉ đọc số đếm** + danh sách người dùng (tên, SĐT, email, vai trò, trạng thái khóa, số thuốc/liều/thiết bị). **Không** trả tên thuốc, hướng dẫn, lý do không uống cho bất kỳ vai trò nào |
+| Khóa tài khoản | Gọi Firebase `disabled=true` + thu hồi refresh token + lưu `disabled_at`; `authMiddleware` chặn **ngay** mọi API bằng 403. Không thể tự khóa chính mình. Manager chỉ khóa được tài khoản người dùng |
 | Mở khóa | `disabled=false` + `disabled_at=null`; người dùng đăng nhập lại bình thường |
-| Đặt lại mật khẩu | Admin nhập mật khẩu mới 8–128 ký tự; backend đặt qua Firebase Admin (cần cho tài khoản SĐT dùng email nội bộ). Không lưu/không trả/không ghi log mật khẩu |
-| Nhật ký | Mỗi lần khóa/mở/đặt lại mật khẩu ghi `audit_logs` (`admin_lock`, `admin_unlock`, `admin_reset_password`) kèm `details.admin_id`; không ghi mật khẩu |
+| Đặt lại mật khẩu | **Chỉ admin** nhập mật khẩu mới 8–128 ký tự; backend đặt qua Firebase Admin (cần cho tài khoản SĐT dùng email nội bộ). Không lưu/không trả/không ghi log mật khẩu |
+| Đổi vai trò | **Chỉ admin**; không thể tự đổi vai trò của mình; không thể hạ quyền admin đang hoạt động cuối cùng; hiệu lực ngay ở API, UI cần tải lại |
+| Nhật ký | Mỗi lần khóa/mở/đặt lại mật khẩu/đổi vai trò ghi `audit_logs` (`admin_lock`, `admin_unlock`, `admin_reset_password`, `admin_set_role`) kèm `details.admin_id`; không ghi mật khẩu |
 | Xóa tài khoản | **Chưa triển khai** — chờ Q4 (chính sách lưu trữ/xóa) |
 
 ---
@@ -118,4 +121,4 @@ stateDiagram-v2
 3. Sinh trước 7 ngày các lần uống.
 4. Quy tắc đổi lịch: không sửa lịch sử, sinh lại lần uống tương lai theo phiên bản mới.
 5. Mã mời 6 chữ số, hạn 15 phút, mỗi lần tạo thì mã cũ vô hiệu.
-6. **Đã duyệt 20/10/2026**: quản trị `/admin` chỉ đọc + khóa/mở + đặt lại mật khẩu; không xóa tài khoản, không xem nội dung y tế chi tiết.
+6. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: `/admin` có 2 vai trò hậu trường — `manager` (xem số liệu/danh sách, khóa/mở tài khoản người dùng) và `admin` (thêm đặt lại mật khẩu, đổi vai trò). Không xóa tài khoản, không xem nội dung y tế chi tiết.

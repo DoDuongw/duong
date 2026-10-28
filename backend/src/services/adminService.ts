@@ -1,5 +1,5 @@
 import type { FilterQuery } from 'mongoose';
-import { User, UserDoc } from '../models/User';
+import { User, UserDoc, UserRole } from '../models/User';
 import { Medication } from '../models/Medication';
 import { DoseOccurrence } from '../models/DoseOccurrence';
 import { FamilyConnection } from '../models/FamilyConnection';
@@ -13,11 +13,11 @@ import {
   setFirebaseUserDisabled,
   setFirebaseUserPassword,
 } from '../config/firebase';
-import { badRequest, notFound, serviceUnavailable } from '../utils/errors';
+import { badRequest, forbidden, notFound, serviceUnavailable } from '../utils/errors';
 import { notificationErrorLabel } from '../utils/notificationLabels';
 
 /**
- * Dịch vụ quản trị (chỉ đọc + khóa/mở + đặt lại mật khẩu).
+ * Dịch vụ quản trị (chỉ đọc + khóa/mở + đặt lại mật khẩu + đổi vai trò).
  *
  * Nguyên tắc riêng tư: danh sách người dùng KHÔNG trả nội dung y tế
  * (tên thuốc, ghi chú, lý do không uống) — chỉ trả số đếm phục vụ vận hành.
@@ -76,7 +76,7 @@ export interface AdminUserItem {
   displayName: string | null;
   phone: string | null;
   email: string | null;
-  role: 'user' | 'admin';
+  role: UserRole;
   disabled: boolean;
   timezone: string;
   createdAt: string;
@@ -264,15 +264,19 @@ function firebaseFailure(action: string): never {
 
 /** Khóa/mở tài khoản: cập nhật Firebase trước, rồi lưu trạng thái + nhật ký */
 export async function setUserDisabled(
-  adminId: string,
+  actorId: string,
+  actorRole: UserRole,
   targetId: string,
   disabled: boolean,
 ): Promise<{ id: string; disabled: boolean }> {
-  if (adminId === targetId) throw badRequest('Không thể khóa tài khoản đang đăng nhập');
+  if (actorId === targetId) throw badRequest('Không thể khóa tài khoản đang đăng nhập');
 
   const user = await User.findById(targetId);
   if (!user) throw notFound('Không tìm thấy người dùng');
   if (!user.firebase_uid) throw badRequest('Người dùng chưa có tài khoản Firebase');
+  if (actorRole === 'manager' && (user.role ?? 'user') !== 'user') {
+    throw forbidden('Quản lý chỉ có thể khóa hoặc mở khóa tài khoản người dùng');
+  }
 
   try {
     await setFirebaseUserDisabled(user.firebase_uid, disabled);
@@ -289,7 +293,7 @@ export async function setUserDisabled(
     entity: 'user',
     entity_id: targetId,
     action: disabled ? 'admin_lock' : 'admin_unlock',
-    details: { admin_id: adminId },
+    details: { admin_id: actorId, admin_role: actorRole },
   });
 
   return { id: String(user._id), disabled: Boolean(user.disabled_at) };
@@ -321,4 +325,39 @@ export async function resetUserPassword(
   });
 
   return { id: String(user._id), reset: true };
+}
+
+/** Đổi vai trò tài khoản (chỉ admin; không tự hạ quyền; giữ ít nhất một admin đang hoạt động) */
+export async function setUserRole(
+  adminId: string,
+  targetId: string,
+  role: UserRole,
+): Promise<{ id: string; role: UserRole }> {
+  if (adminId === targetId) throw badRequest('Không thể đổi vai trò của chính mình');
+
+  const user = await User.findById(targetId);
+  if (!user) throw notFound('Không tìm thấy người dùng');
+
+  const previous = user.role ?? 'user';
+  if (previous === role) return { id: String(user._id), role };
+
+  if (previous === 'admin' && role !== 'admin' && !user.disabled_at) {
+    const activeAdmins = await User.countDocuments({ role: 'admin', disabled_at: null });
+    if (activeAdmins <= 1) {
+      throw badRequest('Không thể hạ quyền quản trị viên đang hoạt động cuối cùng');
+    }
+  }
+
+  user.role = role;
+  await user.save();
+
+  await AuditLog.create({
+    user_id: targetId,
+    entity: 'user',
+    entity_id: targetId,
+    action: 'admin_set_role',
+    details: { admin_id: adminId, from: previous, to: role },
+  });
+
+  return { id: String(user._id), role };
 }

@@ -12,6 +12,7 @@ import {
   requireAdminMiddleware,
   requireAuthMiddleware,
   requireFirebaseAuthMiddleware,
+  requireStaffMiddleware,
 } from '../src/middlewares/auth';
 import { User } from '../src/models/User';
 import { closeDb, createTestUser, initDb, resetDb } from './helpers';
@@ -135,16 +136,31 @@ describe('authMiddleware', () => {
 
     await runMiddleware(authMiddleware, req);
 
+    expect(req.user?.role).toBe('admin');
     expect(req.user?.isAdmin).toBe(true);
   });
 
-  test('R12: người dùng thường → không có cờ isAdmin', async () => {
+  test('R12: người dùng thường → role user, không có cờ isAdmin', async () => {
     await createTestUser('uid-thuong');
     mockVerifyIdToken.mockResolvedValue({ uid: 'uid-thuong' });
     const req = makeReq('Bearer token-hop-le');
 
     await runMiddleware(authMiddleware, req);
 
+    expect(req.user?.role).toBe('user');
+    expect(req.user?.isAdmin).toBeUndefined();
+  });
+
+  test('R16: role manager → req.user.role manager, không có cờ isAdmin', async () => {
+    const user = await createTestUser('uid-manager');
+    user.role = 'manager';
+    await user.save();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'uid-manager' });
+    const req = makeReq('Bearer token-hop-le');
+
+    await runMiddleware(authMiddleware, req);
+
+    expect(req.user?.role).toBe('manager');
     expect(req.user?.isAdmin).toBeUndefined();
   });
 });
@@ -185,6 +201,48 @@ describe('requireFirebaseAuthMiddleware (chỉ cần token — dùng cho /users/
     const next = await runMiddleware(requireFirebaseAuthMiddleware, req);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 401, code: 'UNAUTHENTICATED' }));
+  });
+});
+
+describe('requireStaffMiddleware', () => {
+  test('R17: người dùng thường → 403 FORBIDDEN', async () => {
+    const req = makeReq();
+    req.user = { uid: 'uid-thuong', userId: 'user-thuong', timezone: 'Asia/Ho_Chi_Minh', role: 'user' };
+
+    const next = await runMiddleware(requireStaffMiddleware, req);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 403, code: 'FORBIDDEN' }),
+    );
+  });
+
+  test('R18: role manager → đi tiếp', async () => {
+    const req = makeReq();
+    req.user = { uid: 'uid-manager', userId: 'user-manager', timezone: 'Asia/Ho_Chi_Minh', role: 'manager' };
+
+    const next = await runMiddleware(requireStaffMiddleware, req);
+
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  test('R19: role admin → đi tiếp', async () => {
+    const req = makeReq();
+    req.user = { uid: 'uid-admin', userId: 'user-admin', timezone: 'Asia/Ho_Chi_Minh', role: 'admin', isAdmin: true };
+
+    const next = await runMiddleware(requireStaffMiddleware, req);
+
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  test('R20: chưa có bản ghi user → 401', async () => {
+    const req = makeReq();
+    req.user = { uid: 'uid-moi', timezone: 'Asia/Ho_Chi_Minh' };
+
+    const next = await runMiddleware(requireStaffMiddleware, req);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 401, code: 'UNAUTHENTICATED' }),
+    );
   });
 });
 

@@ -21,11 +21,13 @@ jest.mock('../src/middlewares/auth', () => {
     authMiddleware: (req: any, _res: any, next: any) => {
       const uid = req.headers['x-test-uid'];
       if (uid) {
+        const role = req.headers['x-test-role'];
         req.user = {
           uid: String(uid),
           userId: String(req.headers['x-test-user-id'] ?? ''),
           timezone: 'Asia/Ho_Chi_Minh',
-          ...(req.headers['x-test-admin'] === 'yes' ? { isAdmin: true } : {}),
+          ...(role ? { role: String(role) } : {}),
+          ...(req.headers['x-test-admin'] === 'yes' ? { isAdmin: true, role: 'admin' } : {}),
         };
       }
       next();
@@ -69,12 +71,13 @@ beforeEach(async () => {
   mockRevoke.mockResolvedValue(undefined);
 });
 
-/** Header giả lập đăng nhập; admin=true để qua requireAdminMiddleware */
-function as(userId: string, uid = 'uid', admin = true) {
+/** Header giả lập đăng nhập theo vai trò (mặc định admin) */
+function as(userId: string, uid = 'uid', role: 'user' | 'manager' | 'admin' = 'admin') {
   return {
     'x-test-uid': uid,
     'x-test-user-id': userId,
-    ...(admin ? { 'x-test-admin': 'yes' } : {}),
+    ...(role !== 'user' ? { 'x-test-role': role } : {}),
+    ...(role === 'admin' ? { 'x-test-admin': 'yes' } : {}),
   };
 }
 
@@ -88,7 +91,7 @@ describe('Phân quyền khu vực quản trị', () => {
   test('người dùng thường → 403, không đọc được dữ liệu', async () => {
     const user = await createTestUser('uid-thuong');
 
-    const res = await request(app).get('/api/v1/admin/users').set(as(user.id, 'uid-thuong', false));
+    const res = await request(app).get('/api/v1/admin/users').set(as(user.id, 'uid-thuong', 'user'));
 
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('FORBIDDEN');
@@ -99,7 +102,7 @@ describe('Phân quyền khu vực quản trị', () => {
     admin.role = 'admin';
     await admin.save();
 
-    const res = await request(app).get('/api/v1/users/me').set(as(admin.id, 'uid-admin', false));
+    const res = await request(app).get('/api/v1/users/me').set(as(admin.id, 'uid-admin', 'admin'));
 
     expect(res.status).toBe(200);
     expect(res.body.data.role).toBe('admin');
@@ -108,9 +111,43 @@ describe('Phân quyền khu vực quản trị', () => {
   test('người dùng thường: GET /users/me trả role user', async () => {
     const user = await createTestUser('uid-thuong');
 
-    const res = await request(app).get('/api/v1/users/me').set(as(user.id, 'uid-thuong', false));
+    const res = await request(app).get('/api/v1/users/me').set(as(user.id, 'uid-thuong', 'user'));
 
     expect(res.body.data.role).toBe('user');
+  });
+
+  test('quản lý: GET /users/me trả role manager và đọc được khu vận hành', async () => {
+    const manager = await createTestUser('uid-manager');
+    manager.role = 'manager';
+    await manager.save();
+
+    const me = await request(app).get('/api/v1/users/me').set(as(manager.id, 'uid-manager', 'manager'));
+    const summary = await request(app)
+      .get('/api/v1/admin/summary')
+      .set(as(manager.id, 'uid-manager', 'manager'));
+
+    expect(me.body.data.role).toBe('manager');
+    expect(summary.status).toBe(200);
+  });
+
+  test('quản lý không được đặt lại mật khẩu hoặc đổi vai trò', async () => {
+    const manager = await createTestUser('uid-manager');
+    manager.role = 'manager';
+    await manager.save();
+    const target = await createTestUser('uid-target', '0900000002');
+
+    const reset = await request(app)
+      .post(`/api/v1/admin/users/${target.id}/reset-password`)
+      .set(as(manager.id, 'uid-manager', 'manager'))
+      .send({ password: 'mat-khau-moi-123' });
+    const changeRole = await request(app)
+      .patch(`/api/v1/admin/users/${target.id}/role`)
+      .set(as(manager.id, 'uid-manager', 'manager'))
+      .send({ role: 'manager' });
+
+    expect(reset.status).toBe(403);
+    expect(changeRole.status).toBe(403);
+    expect(mockSetPassword).not.toHaveBeenCalled();
   });
 });
 
@@ -230,6 +267,49 @@ describe('PATCH /admin/users/:id/status — khóa/mở tài khoản', () => {
     expect(mockSetDisabled).not.toHaveBeenCalled();
   });
 
+  test('quản lý khóa được người dùng thường và nhật ký ghi đúng vai trò', async () => {
+    const manager = await createTestUser('uid-manager');
+    manager.role = 'manager';
+    await manager.save();
+    const target = await createTestUser('uid-target', '0900000002');
+
+    const res = await request(app)
+      .patch(`/api/v1/admin/users/${target.id}/status`)
+      .set(as(manager.id, 'uid-manager', 'manager'))
+      .send({ disabled: true });
+
+    expect(res.status).toBe(200);
+    expect(mockSetDisabled).toHaveBeenCalledWith('uid-target', true);
+
+    const log = await AuditLog.findOne({ action: 'admin_lock' });
+    expect(log!.details).toMatchObject({ admin_id: String(manager.id), admin_role: 'manager' });
+  });
+
+  test('quản lý không được khóa tài khoản quản lý hoặc quản trị', async () => {
+    const manager = await createTestUser('uid-manager');
+    manager.role = 'manager';
+    await manager.save();
+    const otherManager = await createTestUser('uid-manager-2', '0900000002');
+    otherManager.role = 'manager';
+    await otherManager.save();
+    const admin = await createTestUser('uid-admin-2', '0900000003');
+    admin.role = 'admin';
+    await admin.save();
+
+    const lockManager = await request(app)
+      .patch(`/api/v1/admin/users/${otherManager.id}/status`)
+      .set(as(manager.id, 'uid-manager', 'manager'))
+      .send({ disabled: true });
+    const lockAdmin = await request(app)
+      .patch(`/api/v1/admin/users/${admin.id}/status`)
+      .set(as(manager.id, 'uid-manager', 'manager'))
+      .send({ disabled: true });
+
+    expect(lockManager.status).toBe(403);
+    expect(lockAdmin.status).toBe(403);
+    expect(mockSetDisabled).not.toHaveBeenCalled();
+  });
+
   test('khóa: gọi Firebase disabled + lưu disabled_at + ghi nhật ký', async () => {
     const admin = await createTestUser('uid-admin');
     const target = await createTestUser('uid-target', '0900000002');
@@ -335,6 +415,59 @@ describe('POST /admin/users/:id/reset-password', () => {
       .set(as(admin.id))
       .send({ password: 'mat-khau-moi-123' });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('PATCH /admin/users/:id/role — đổi vai trò', () => {
+  test('admin đổi người dùng thành quản lý + ghi nhật ký from/to', async () => {
+    const admin = await createTestUser('uid-admin');
+    admin.role = 'admin';
+    await admin.save();
+    const target = await createTestUser('uid-target', '0900000002');
+
+    const res = await request(app)
+      .patch(`/api/v1/admin/users/${target.id}/role`)
+      .set(as(admin.id, 'uid-admin', 'admin'))
+      .send({ role: 'manager' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ id: String(target.id), role: 'manager' });
+
+    const fresh = await User.findById(target.id);
+    expect(fresh!.role).toBe('manager');
+
+    const log = await AuditLog.findOne({ action: 'admin_set_role' });
+    expect(log).not.toBeNull();
+    expect(log!.details).toMatchObject({
+      admin_id: String(admin.id),
+      from: 'user',
+      to: 'manager',
+    });
+  });
+
+  test('admin không thể tự đổi vai trò của mình → 400', async () => {
+    const admin = await createTestUser('uid-admin');
+    admin.role = 'admin';
+    await admin.save();
+
+    const res = await request(app)
+      .patch(`/api/v1/admin/users/${admin.id}/role`)
+      .set(as(admin.id, 'uid-admin', 'admin'))
+      .send({ role: 'manager' });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('vai trò không hợp lệ → 400', async () => {
+    const admin = await createTestUser('uid-admin');
+    const target = await createTestUser('uid-target', '0900000002');
+
+    const res = await request(app)
+      .patch(`/api/v1/admin/users/${target.id}/role`)
+      .set(as(admin.id, 'uid-admin', 'admin'))
+      .send({ role: 'superadmin' });
+
+    expect(res.status).toBe(400);
   });
 });
 

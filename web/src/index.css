@@ -1455,6 +1455,12 @@ a {
   border: 1px solid #b9d5ea;
 }
 
+.badge--manager {
+  background: var(--c-warning-soft);
+  color: var(--c-warning);
+  border: 1px solid #ecd3a8;
+}
+
 .badge--active {
   background: var(--c-success-soft);
   color: #1d5233;

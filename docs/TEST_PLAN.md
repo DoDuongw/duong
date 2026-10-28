@@ -411,43 +411,50 @@ Người dùng đã chạy: **N1 đạt** (push tới, trễ ~2 phút) và **N9 
 | A6 | Tài khoản người thân bị tắt `view_schedule` | Không hiện cảnh báo (và không hiện lịch) |
 | A7 | Kiểm tra tương phản khối cảnh báo (nền `--c-danger-soft`, viền `--c-danger`) ở zoom 200% | Chữ đỏ trên nền hồng nhạt đọc rõ; viền trái 5px thấy được |
 
-### 7.18 Đợt 11 — khu vực quản trị `/admin` (20/10/2026)
+### 7.18 Đợt 11 — khu vực vận hành `/admin` (20/10/2026, mở rộng 27/10/2026)
 
-**Bối cảnh**: người dùng hỏi dự án có nên có giao diện quản trị. Đối chiếu `API_SPEC.md` cũ (“Admin hệ thống — không có trong phạm vi”), `README` lại hứa “liên hệ quản trị viên” khi tài khoản SĐT quên mật khẩu nhưng **không có công cụ nào**. Người dùng chốt: **chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu**, duyệt thêm `users.role`; sau đó duyệt thêm `users.disabled_at` để khóa có hiệu lực ngay.
+**Bối cảnh**: người dùng hỏi dự án có nên có giao diện quản trị. Đối chiếu `API_SPEC.md` cũ (“Admin hệ thống — không có trong phạm vi”), `README` lại hứa “liên hệ quản trị viên” khi tài khoản SĐT quên mật khẩu nhưng **không có công cụ nào**. Người dùng chốt: **chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu**, duyệt thêm `users.role`; sau đó duyệt thêm `users.disabled_at` để khóa có hiệu lực ngay. Ngày 27/10/2026 chốt thêm role **`manager`** (vận hành nội bộ) và admin **đổi vai trò** trong `/admin` + CLI.
 
 **Giới hạn phạm vi**: `/admin` là **khu vực hậu trường ngoài M01–M08**, không phải màn hình M09; không đổi luồng nghiệp vụ của 8 màn hình; **không có xóa tài khoản** (Q4 chưa chốt).
 
 **Backend đã làm**:
-- `models/User.ts`: `role: 'user'|'admin'` (mặc định `user`), `disabled_at: Date|null`.
-- `middlewares/auth.ts`: chặn tài khoản bị khóa bằng **403** ngay trong `authMiddleware`; gắn `isAdmin`; thêm `requireAdminMiddleware`.
+- `models/User.ts`: `role: 'user'|'manager'|'admin'` (mặc định `user`), `disabled_at: Date|null`.
+- `middlewares/auth.ts`: chặn tài khoản bị khóa bằng **403** ngay trong `authMiddleware`; gắn `role` + `isAdmin`; thêm `requireStaffMiddleware` (manager/admin) và giữ `requireAdminMiddleware` cho thao tác nâng cao.
 - `config/firebase.ts`: `setFirebaseUserDisabled`, `setFirebaseUserPassword`, `revokeFirebaseRefreshTokens`, `getFirebaseUserEmails` (1 lần/trang), `getFirebaseUserByEmail`, `isFirebaseReady`.
-- `services/adminService.ts` + `routes/admin.ts` + mount `/api/v1/admin`: summary, danh sách người dùng (tìm/phân trang, **không** nội dung y tế), lỗi gửi thông báo (`error` = nhãn tiếng Việt, `errorCode` = mã gốc), nhật ký, khóa/mở, đặt lại mật khẩu. Khóa/mở/đặt lại mật khẩu ghi `audit_logs`, không ghi mật khẩu.
-- `src/scripts/grantAdmin.ts` + `npm run admin:grant -- <email hoặc SĐT>`: cấp admin đầu tiên (không có endpoint tự cấp).
+- `services/adminService.ts` + `routes/admin.ts` + mount `/api/v1/admin`: summary, danh sách người dùng (tìm/phân trang, **không** nội dung y tế), lỗi gửi thông báo (`error` = nhãn tiếng Việt, `errorCode` = mã gốc), nhật ký, khóa/mở, đặt lại mật khẩu, đổi vai trò. Manager chỉ khóa/mở tài khoản người dùng; reset/role chỉ admin. Khóa/mở/reset/role ghi `audit_logs`, không ghi mật khẩu.
+- `src/scripts/grantAdmin.ts` + `npm run admin:grant` / `npm run role:set`: cấp/đổi vai trò bằng CLI (`--role user|manager|admin`), không có endpoint tự cấp; chặn hạ quyền admin đang hoạt động cuối cùng.
 - `GET/PATCH /users/me` trả thêm `role`.
 
-**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; **nút “Quản trị hệ thống” cố định ở đầu trang, chỉ hiện khi `profile.role='admin'`** (đã bỏ khỏi M08); giao diện quản trị bố cục **hai cột trên màn hình lớn**, thanh tiêu đề có thời điểm cập nhật + **Tải lại**, 8 thẻ số liệu có nhãn ngữ cảnh, tìm kiếm + **Xóa lọc**, thẻ người dùng có avatar/badge trạng thái, lỗi gửi thông báo + nhật ký dạng timeline; types/endpoints admin; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa và đặt lại mật khẩu (≥ 8 ký tự, nhập lại). Mã lỗi gửi thông báo (`no_active_device`…), loại đối tượng/nhật ký và múi giờ được dịch sang nhãn tiếng Việt.
+**Web đã làm**: route `/admin` (layout riêng, không tab bar) + `screens/Admin.tsx`; **nút cố định ở đầu trang** — “Quản trị hệ thống” với admin, “Khu vận hành” với manager (đã bỏ khỏi M08); giao diện vận hành bố cục **hai cột trên màn hình lớn**, thanh tiêu đề có thời điểm cập nhật + **Tải lại**, 8 thẻ số liệu có nhãn ngữ cảnh, tìm kiếm + **Xóa lọc**, thẻ người dùng có avatar/badge vai trò/trạng thái, lỗi gửi thông báo + nhật ký dạng timeline; types/endpoints vận hành; CSS `.admin-*` dùng token y tế; hộp thoại xác nhận khóa, đặt lại mật khẩu (≥ 8 ký tự, nhập lại) và đổi vai trò (chỉ admin). Mã lỗi gửi thông báo (`no_active_device`…), loại đối tượng/nhật ký và múi giờ được dịch sang nhãn tiếng Việt.
 
 **Kết quả chạy lệnh (đã chạy thật)**:
-- Backend: `npm run lint` (`tsc --noEmit`) sạch; `npm test` **146/146** (9 suite; **+24 test**: 18 `tests/admin.test.ts` + 6 middleware R10–R15).
-- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **164/164** (18 file; **+15**: 10 admin, 3 lối tắt, 2 nhãn múi giờ); `npm run build` OK (**495,34 kB / gzip 148,65 kB**; CSS 24,32 kB / gzip 4,82 kB).
+- Backend: `npm run lint` (`tsc --noEmit`) sạch; `npm test` **158/158** (9 suite; **+12 test** cho vai trò manager + đổi vai trò).
+- Web: `npm run typecheck` sạch; `npm run lint` (oxlint) sạch; `npm test` **168/168** (18 file; **+4 test** cho manager/đổi vai trò); `npm run build` OK (**498,08 kB / gzip 149,21 kB**; CSS 24,42 kB / gzip 4,84 kB).
 
-**Test tự động đã phủ**: 401/403 khu vực admin; role trả về `/users/me`; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI admin: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công, nút **Tải lại** gọi lại cả 4 API; mã lỗi gửi thông báo được trả về dưới dạng **nhãn tiếng Việt** + `errorCode` gốc.
+**Test tự động đã phủ**: 401/403 khu vực vận hành; role trả về `/users/me` cho user/manager/admin; manager đọc được summary nhưng reset/role bị 403; manager khóa được người dùng, không khóa được manager/admin; admin đổi role + audit `from/to`; không tự đổi role; role không hợp lệ bị 400; summary đếm đúng **24 giờ đã qua** (loại liều tương lai) + không lộ tên thuốc; tìm/phân trang; không tự khóa mình; khóa/mở gọi Firebase + lưu `disabled_at` + audit; mật khẩu < 8 ký tự bị chặn; reset gọi Firebase + audit **không chứa mật khẩu**; notification/audit list; middleware chặn tài khoản bị khóa; UI: không quyền, số liệu/danh sách, tìm, phân trang, khóa, mở khóa, validate + reset thành công, đổi vai trò, nút **Tải lại**; lối tắt admin/manager; mã lỗi gửi thông báo trả về **nhãn tiếng Việt** + `errorCode` gốc.
 
 **CHƯA KIỂM THỬ (ghi rõ, không đánh dấu đạt)**:
-1. **Chưa mở `/admin` trên trình duyệt thật**; chưa chạy **A8–A14** dưới đây.
+1. **Chưa mở `/admin` trên trình duyệt thật**; chưa chạy **A8–A20** dưới đây, gồm cả giao diện manager và đổi vai trò.
 2. **Chưa gọi Firebase thật** cho khóa/mở/đặt lại mật khẩu và lấy email hàng loạt — test backend **mock** các hàm này. Cần chạy với service account thật để xác nhận `updateUser({disabled})`, `updateUser({password})`, `revokeRefreshTokens`, `getUsers` hoạt động đúng.
 3. Chưa kiểm tra **token cũ sau khi khóa**: API phải trả 403 ngay; đăng nhập lại phải bị Firebase chặn.
 4. Chưa kiểm tra **đặt lại mật khẩu cho tài khoản SĐT** rồi đăng nhập bằng mật khẩu mới trên thiết bị thật.
-5. Không có xóa tài khoản (chờ Q4).
+5. Chưa kiểm tra **đổi vai trò trên tài khoản thật**: manager/admin thấy đúng nút, quyền API đổi ngay, UI cần tải lại; chưa xác nhận hạ quyền admin cuối cùng bị chặn.
+6. Không có xóa tài khoản (chờ Q4).
 
-**Kịch bản kiểm thử tay mới — quản trị**:
+**Kịch bản kiểm thử tay mới — vận hành**:
 
 | Bước | Thao tác | Kết quả mong đợi |
 |---|---|---|
-| A8 | Trong `backend/`, chạy `npm run admin:grant -- <email hoặc SĐT của bạn>` | In “Đã cấp quyền admin…”; tải lại web thấy nút “Quản trị hệ thống” ở đầu trang (không cần vào M08) |
-| A9 | Đăng nhập tài khoản **thường**, mở thẳng `/admin` | Thấy “Tài khoản của bạn không có quyền truy cập…”, không có số liệu; API admin trả 403 |
-| A10 | Admin mở `/admin` | Thấy 8 thẻ số liệu, bố cục hai cột trên màn hình lớn (xếp dọc trên điện thoại), danh sách người dùng, mục lỗi push, nhật ký; nút “Tải lại” cập nhật lại dữ liệu; **không** thấy tên thuốc/lý do không uống |
+| A8 | Trong `backend/`, chạy `npm run admin:grant -- <email hoặc SĐT của bạn>` | In “Đã đặt vai trò admin…”; tải lại web thấy nút “Quản trị hệ thống” ở đầu trang (không cần vào M08) |
+| A9 | Đăng nhập tài khoản **thường**, mở thẳng `/admin` | Thấy “Tài khoản của bạn không có quyền truy cập…”, không có số liệu; API vận hành trả 403 |
+| A10 | Admin mở `/admin` | Thấy 8 thẻ số liệu, bố cục hai cột trên màn hình lớn (xếp dọc trên điện thoại), danh sách người dùng, mục lỗi gửi thông báo, nhật ký; nút “Tải lại” cập nhật lại dữ liệu; **không** thấy tên thuốc/lý do không uống |
 | A11 | Tìm theo tên và SĐT; bấm trang sau | Kết quả lọc đúng; phân trang đúng, không tải lại toàn trang |
 | A12 | Khóa một tài khoản thử → mở cửa sổ ẩn danh đăng nhập tài khoản đó | Đăng nhập bị chặn (Firebase disabled); token cũ gọi API nhận 403 “Tài khoản đã bị khóa…” |
 | A13 | Mở khóa → đăng nhập lại | Vào được bình thường; badge “Đã khóa” biến mất; nhật ký có `admin_lock` + `admin_unlock` |
 | A14 | Đặt lại mật khẩu cho tài khoản SĐT → đăng xuất tài khoản đó → đăng nhập bằng mật khẩu mới | Đăng nhập thành công; nhật ký có `admin_reset_password`; **không** thấy mật khẩu trong UI/nhật ký/DB |
+| A15 | Chạy `npm run admin:grant -- <email/SĐT> --role manager`; đăng nhập lại tài khoản đó | Thấy nút **“Khu vận hành”**; mở `/admin` thấy số liệu/danh sách, **không** có nút “Đặt lại mật khẩu”/“Đổi vai trò” |
+| A16 | Manager khóa một tài khoản người dùng, rồi thử khóa tài khoản manager/admin khác | Khóa người dùng thành công; tài khoản manager/admin không có nút thao tác và API trả 403 |
+| A17 | Dùng token manager gọi `POST /admin/users/:id/reset-password` và `PATCH /admin/users/:id/role` | Cả hai trả 403; không có thay đổi dữ liệu/nhật ký |
+| A18 | Admin đổi một người dùng thành **Quản lý** trong hộp thoại “Đổi vai trò” | API 200; thông báo đổi vai trò; nhật ký `admin_set_role` có `from/to`; tài khoản đó tải lại thấy nút “Khu vận hành” |
+| A19 | Admin thử đổi vai trò của chính mình; thử hạ quyền admin đang hoạt động cuối cùng (nếu có thể) | Tự đổi bị chặn 400; không thể hạ admin cuối cùng; UI hiển thị lỗi tiếng Việt |
+| A20 | Manager/admin xem danh sách, lỗi gửi thông báo, nhật ký | Không thấy tên thuốc, hướng dẫn, lý do không uống, token FCM hay `firebase_uid` |

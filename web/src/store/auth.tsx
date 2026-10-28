@@ -11,6 +11,10 @@ import { getProfile, syncProfile } from '../services/endpoints';
 import {
   isFirebaseConfigured,
   onAuthChange,
+  reloadCurrentUser,
+  resendVerificationEmail,
+  sendPasswordReset as firebaseSendPasswordReset,
+  sendVerificationEmail,
   signIn as firebaseSignIn,
   signOut as firebaseSignOut,
   signUp as firebaseSignUp,
@@ -28,14 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Tải hồ sơ backend; lần đăng nhập đầu chưa có bản ghi → tạo bằng POST /users/me/sync.
-   *
-   * Lưu ý: backend trả **401** (`requireAuthMiddleware` — token hợp lệ nhưng chưa có
-   * bản ghi user), không phải 404, nên phải xử lý cả 401 lẫn 404.
-   * `loadProfile` có thể bị gọi đồng thời (listener `onAuthChange` + `login/register`)
-   * → giữ một promise đang chạy để tránh tạo bản ghi trùng.
-   */
   const inflight = useRef<Promise<void> | null>(null);
 
   const loadProfile = useCallback(async (seed?: { displayName?: string; phone?: string; address?: string }) => {
@@ -48,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             setProfile(await syncProfile(seed));
           } catch {
-            // Không tạo được — màn hình dùng múi giờ mặc định
+            // Không tạo được → màn hình dạng mới giữ mặc định
           }
         }
       }
@@ -79,7 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null);
       try {
         await firebaseSignIn(identifier, password);
-        // Lần đăng nhập đầu: tạo bản ghi user (POST /users/me/sync) trước khi vào M01
         await loadProfile();
       } catch (e) {
         setError(firebaseAuthMessage(e));
@@ -97,8 +92,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ) => {
       setError(null);
       try {
-        await firebaseSignUp(identifier, password);
-        // Truyền SĐT/địa chỉ để lần sync đầu lưu luôn vào hồ sơ backend
+        const firebaseUser = await firebaseSignUp(identifier, password);
+        try {
+          await sendVerificationEmail(firebaseUser);
+        } catch {
+          // Không chặn đăng ký nếu không gửi được email xác minh
+        }
         await loadProfile(extra);
       } catch (e) {
         setError(firebaseAuthMessage(e));
@@ -110,7 +109,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     setError(null);
-    // Hủy token Web Push + đóng notification đang hiển thị trước khi đăng xuất
     try {
       await disableWebPush();
     } catch {
@@ -119,6 +117,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut();
     setUser(null);
     setProfile(null);
+  }, []);
+
+  const resendVerification = useCallback(async () => {
+    setError(null);
+    try {
+      await resendVerificationEmail();
+    } catch (e) {
+      setError(firebaseAuthMessage(e));
+      throw e;
+    }
+  }, []);
+
+  const reloadUser = useCallback(async () => {
+    setError(null);
+    try {
+      const refreshed = await reloadCurrentUser();
+      if (refreshed) {
+        setUser({
+          uid: refreshed.uid,
+          email: refreshed.email ?? user?.email ?? '',
+          emailVerified: refreshed.emailVerified,
+        });
+      }
+    } catch (e) {
+      setError(firebaseAuthMessage(e));
+      throw e;
+    }
+  }, [user?.email]);
+
+  const sendPasswordReset = useCallback(async (identifier: string) => {
+    setError(null);
+    try {
+      await firebaseSendPasswordReset(identifier);
+    } catch (e) {
+      setError(firebaseAuthMessage(e));
+      throw e;
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -135,8 +170,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refreshProfile: loadProfile,
       clearError: () => setError(null),
+      resendVerification,
+      reloadUser,
+      sendPasswordReset,
     }),
-    [initializing, user, profile, error, login, register, logout, loadProfile],
+    [initializing, user, profile, error, login, register, logout, loadProfile, resendVerification, reloadUser, sendPasswordReset],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

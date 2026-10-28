@@ -5,13 +5,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Admin } from '../screens/Admin';
 import { AdminShortcut } from '../components/AdminShortcut';
 import { AuthContext, type AuthContextValue } from '../store/authContext';
-import type { AdminSummary, AdminUserItem, AdminUserPage, UserProfile } from '../types';
+import type { AdminSummary, AdminUserItem, AdminUserPage, UserProfile, UserRole } from '../types';
 
 vi.mock('../services/endpoints', () => ({
   getAdminSummary: vi.fn(),
   getAdminUsers: vi.fn(),
   setAdminUserDisabled: vi.fn(),
   adminResetPassword: vi.fn(),
+  setAdminUserRole: vi.fn(),
   getAdminNotifications: vi.fn(),
   getAdminAuditLogs: vi.fn(),
 }));
@@ -23,6 +24,7 @@ import {
   getAdminSummary,
   getAdminUsers,
   setAdminUserDisabled,
+  setAdminUserRole,
 } from '../services/endpoints';
 
 const summary: AdminSummary = {
@@ -55,7 +57,7 @@ function page(overrides: Partial<AdminUserPage> = {}): AdminUserPage {
   return { items: [adminUser], page: 1, pageSize: 10, total: 1, ...overrides };
 }
 
-function profile(role: 'user' | 'admin' = 'admin'): UserProfile {
+function profile(role: UserRole = 'admin'): UserProfile {
   return {
     id: 'admin-1',
     phone: null,
@@ -67,7 +69,7 @@ function profile(role: 'user' | 'admin' = 'admin'): UserProfile {
   };
 }
 
-function authValue(role: 'user' | 'admin' = 'admin'): AuthContextValue {
+function authValue(role: UserRole = 'admin'): AuthContextValue {
   return {
     initializing: false,
     user: { uid: 'uid', email: 'admin@example.com' },
@@ -94,7 +96,7 @@ function renderAdmin(auth: AuthContextValue = authValue()) {
   );
 }
 
-function renderShortcut(role: 'user' | 'admin', path = '/') {
+function renderShortcut(role: UserRole, path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <AuthContext.Provider value={authValue(role)}>
@@ -112,13 +114,14 @@ beforeEach(() => {
   vi.mocked(getAdminAuditLogs).mockResolvedValue([]);
   vi.mocked(setAdminUserDisabled).mockResolvedValue({ id: 'u1', disabled: true });
   vi.mocked(adminResetPassword).mockResolvedValue({ id: 'u1', reset: true });
+  vi.mocked(setAdminUserRole).mockResolvedValue({ id: 'u1', role: 'manager' });
 });
 
 describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
   it('người dùng thường không vào được và không gọi API quản trị', () => {
     renderAdmin(authValue('user'));
 
-    expect(screen.getByRole('heading', { name: 'Quản trị hệ thống' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Khu vực vận hành' })).toBeInTheDocument();
     expect(screen.getByText(/không có quyền truy cập/)).toBeInTheDocument();
     expect(getAdminSummary).not.toHaveBeenCalled();
     expect(getAdminUsers).not.toHaveBeenCalled();
@@ -135,6 +138,25 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
     expect(screen.getByText(/Tạo ngày/)).toBeInTheDocument();
     expect(screen.getByText(/Múi giờ Việt Nam \(GMT\+7\)/)).toBeInTheDocument();
     expect(screen.queryByText(/Thuốc test/)).not.toBeInTheDocument();
+  });
+
+  it('quản lý vào khu vận hành nhưng không thấy đặt lại mật khẩu/đổi vai trò', async () => {
+    renderAdmin(authValue('manager'));
+
+    expect(await screen.findByRole('heading', { name: 'Khu vực vận hành' })).toBeInTheDocument();
+    await screen.findByText('Bà Lan');
+    expect(screen.getByRole('button', { name: 'Khóa tài khoản Bà Lan' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đặt lại mật khẩu cho Bà Lan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đổi vai trò cho Bà Lan' })).not.toBeInTheDocument();
+  });
+
+  it('quản lý không thấy nút thao tác trên tài khoản quản lý/quản trị', async () => {
+    vi.mocked(getAdminUsers).mockResolvedValue(page({ items: [{ ...adminUser, role: 'manager' }] }));
+    renderAdmin(authValue('manager'));
+
+    await screen.findByText('Bà Lan');
+    expect(screen.queryByRole('button', { name: /Khóa tài khoản/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Chỉ quản trị viên mới thao tác được tài khoản này.')).toBeInTheDocument();
   });
 
   it('dịch mã lỗi gửi thông báo và nhãn nhật ký sang tiếng Việt', async () => {
@@ -160,6 +182,16 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
         createdAt: '2026-10-20T03:00:00.000Z',
         details: null,
       },
+      {
+        id: 'a2',
+        action: 'admin_set_role',
+        entity: 'user',
+        entityId: 'u1',
+        actorName: 'Quản trị',
+        actorPhone: null,
+        createdAt: '2026-10-20T04:00:00.000Z',
+        details: { from: 'user', to: 'manager' },
+      },
     ]);
     renderAdmin();
     await screen.findByText('Bà Lan');
@@ -167,7 +199,11 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
     expect(await screen.findByText('Thiết bị hiện không hoạt động')).toBeInTheDocument();
     expect(screen.queryByText('no_active_device')).not.toBeInTheDocument();
     expect(await screen.findByText('Chấp nhận lời mời')).toBeInTheDocument();
+    const auditSection = screen.getByText('Nhật ký thao tác').closest('section');
+    expect(auditSection).not.toBeNull();
+    expect(within(auditSection as HTMLElement).getByText('Đổi vai trò')).toBeInTheDocument();
     expect(screen.queryByText(/accept_invite/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/admin_set_role/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\bconnection\b/)).not.toBeInTheDocument();
   });
 
@@ -287,9 +323,24 @@ describe('Khu vực quản trị (chỉ đọc + khóa/mật khẩu)', () => {
     expect(screen.getByText(/kênh riêng/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('admin đổi vai trò: chọn quản lý trong hộp thoại → gọi API và thông báo', async () => {
+    const user = userEvent.setup();
+    renderAdmin();
+    await screen.findByText('Bà Lan');
+
+    await user.click(screen.getByRole('button', { name: 'Đổi vai trò cho Bà Lan' }));
+    const dialog = screen.getByRole('dialog', { name: 'Đổi vai trò' });
+    await user.selectOptions(within(dialog).getByLabelText('Vai trò'), 'manager');
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu vai trò' }));
+
+    await waitFor(() => expect(setAdminUserRole).toHaveBeenCalledWith('u1', 'manager'));
+    expect(await screen.findByText(/Đã đổi vai trò của Bà Lan thành “Quản lý”/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });
 
-describe('Lối tắt quản trị ngoài M08', () => {
+describe('Lối tắt vận hành ngoài M08', () => {
   it('admin thấy nút “Quản trị hệ thống” trên màn hình ứng dụng', () => {
     renderShortcut('admin');
 
@@ -297,10 +348,18 @@ describe('Lối tắt quản trị ngoài M08', () => {
     expect(link).toHaveAttribute('href', '/admin');
   });
 
-  it('người dùng thường không thấy lối tắt quản trị', () => {
+  it('quản lý thấy nút “Khu vận hành” trên màn hình ứng dụng', () => {
+    renderShortcut('manager');
+
+    const link = screen.getByRole('link', { name: 'Khu vận hành' });
+    expect(link).toHaveAttribute('href', '/admin');
+  });
+
+  it('người dùng thường không thấy lối tắt vận hành', () => {
     renderShortcut('user');
 
     expect(screen.queryByRole('link', { name: 'Quản trị hệ thống' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Khu vận hành' })).not.toBeInTheDocument();
   });
 
   it('không lặp lối tắt khi đang ở chính trang /admin', () => {

@@ -2,6 +2,9 @@
 
 export type DoseStatus = 'pending' | 'snoozed' | 'confirmed' | 'cannot_take' | 'overdue' | 'missed';
 
+/** Vai trò tài khoản: người dùng · quản lý vận hành · quản trị hệ thống */
+export type UserRole = 'user' | 'manager' | 'admin';
+
 export type MedicationStatus = 'active' | 'discontinued';
 
 export type ScheduleStatus = 'active' | 'archived';
@@ -25,8 +28,8 @@ export interface UserProfile {
   address: string | null;
   timezone: string;
   preferences: UserPreferences | null;
-  /** 'admin' = tài khoản quản trị (thấy mục /admin); backend luôn trả về */
-  role?: 'user' | 'admin';
+  /** 'manager' = quản lý vận hành; 'admin' = quản trị (thấy khu /admin); backend luôn trả về */
+  role?: UserRole;
 }
 
 export interface MedicationSchedule {
@@ -147,7 +150,7 @@ export interface FamilyInviteCreated {
   expiresAt: string;
 }
 
-/* ---------- Khu vực quản trị (chỉ role='admin') ---------- */
+/* ---------- Khu vực vận hành (role='manager' hoặc 'admin') ---------- */
 
 export interface AdminSummary {
   users: number;
@@ -165,7 +168,7 @@ export interface AdminUserItem {
   displayName: string | null;
   phone: string | null;
   email: string | null;
-  role: 'user' | 'admin';
+  role: UserRole;
   disabled: boolean;
   timezone: string;
   createdAt: string;

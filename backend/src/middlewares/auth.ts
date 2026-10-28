@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyIdToken } from '../config/firebase';
-import { User } from '../models/User';
+import { User, UserRole } from '../models/User';
 import { unauthenticated, forbidden } from '../utils/errors';
 import { env } from '../config/env';
 
@@ -10,6 +10,8 @@ export interface AuthUser {
   userId?: string;
   /** Múi giờ của người dùng (mặc định TZ_DEFAULT) — dùng để quy đổi ngày/giờ địa phương */
   timezone: string;
+  /** Vai trò tài khoản; chỉ có khi đã có bản ghi user */
+  role?: UserRole;
   /** true khi users.role = 'admin' (không gắn false để giữ nguyên dạng cũ của req.user) */
   isAdmin?: boolean;
 }
@@ -51,6 +53,7 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
       uid,
       userId: user ? user._id.toString() : undefined,
       timezone: user?.timezone || env.TZ_DEFAULT,
+      ...(user ? { role: user.role ?? 'user' } : {}),
       ...(user?.role === 'admin' ? { isAdmin: true } : {}),
     };
     next();
@@ -89,6 +92,11 @@ export function currentTimezone(req: Request): string {
   return req.user?.timezone || env.TZ_DEFAULT;
 }
 
+/** Vai trò của người dùng đang đăng nhập; chưa có bản ghi → 'user' */
+export function currentUserRole(req: Request): UserRole {
+  return req.user?.role ?? 'user';
+}
+
 /** Cần user đã có bản ghi trong CSDL */
 export function requireAuthMiddleware(req: Request, _res: Response, next: NextFunction): void {
   if (!req.user?.userId) {
@@ -98,14 +106,27 @@ export function requireAuthMiddleware(req: Request, _res: Response, next: NextFu
   next();
 }
 
-/** Cần tài khoản quản trị (users.role = 'admin') — dùng cho toàn bộ /api/v1/admin */
+/** Cần tài khoản vận hành (manager hoặc admin) — dùng cho khu vực /api/v1/admin */
+export function requireStaffMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  if (!req.user?.userId) {
+    next(unauthenticated());
+    return;
+  }
+  if (req.user.role !== 'manager' && req.user.role !== 'admin' && !req.user.isAdmin) {
+    next(forbidden('Chỉ quản lý hoặc quản trị viên mới được truy cập'));
+    return;
+  }
+  next();
+}
+
+/** Cần tài khoản quản trị (users.role = 'admin') — dùng cho thao tác quản trị nâng cao */
 export function requireAdminMiddleware(req: Request, _res: Response, next: NextFunction): void {
   if (!req.user?.userId) {
     next(unauthenticated());
     return;
   }
-  if (!req.user.isAdmin) {
-    next(forbidden('Chỉ quản trị viên mới được truy cập'));
+  if (!req.user.isAdmin && req.user.role !== 'admin') {
+    next(forbidden('Chỉ quản trị viên mới được thực hiện thao tác này'));
     return;
   }
   next();

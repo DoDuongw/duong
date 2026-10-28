@@ -19,6 +19,9 @@ function authValue(overrides: Partial<AuthContextValue> = {}): AuthContextValue 
     logout: vi.fn(),
     clearError: vi.fn(),
     refreshProfile: vi.fn(),
+    resendVerification: vi.fn(),
+    reloadUser: vi.fn(),
+    sendPasswordReset: vi.fn(),
     ...overrides,
   };
 }
@@ -43,8 +46,8 @@ describe('Trang giới thiệu + đăng nhập (R4)', () => {
 
     expect(screen.getByRole('heading', { name: /Nhắc lịch uống thuốc/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Công dụng và tiện ích/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Lợi ích khi sử dụng/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Bắt đầu trong 3 bước/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: //An tâm hơn cho cả hai thế hệ/
+    expect(screen.getByRole('heading', { name: //Tạo tài khoản miễn phí/
     expect(screen.getByText(/Người thân cùng theo dõi/)).toBeInTheDocument();
   });
 

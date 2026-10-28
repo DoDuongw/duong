@@ -2,7 +2,7 @@
 
 Dự án gồm `backend/` (Node.js + Express + TypeScript + MongoDB) và `web/` (React + Vite + TypeScript, website responsive mobile-first + PWA). Tài liệu thiết kế nằm trong `docs/`.
 
-> **Giai đoạn hiện tại**: **Giai đoạn 8 (hoàn thiện và bàn giao) đang tiến hành** — Giai đoạn 0–7 đã xong: backend có đủ nghiệp vụ (thuốc, lịch, lần uống, thông báo, người thân) + **API quản trị** + **146 test**; `web/` có 8 màn hình M01–M08 **đã nối API thật**, đăng nhập Firebase thật, Web Push code + cấu hình xong, **khu vực quản trị `/admin`**. Còn lại: 2 kịch bản push cần thiết bị thật (N7 iOS, N12 2 tài khoản), kiểm thử tay quản trị (A8–A14) và bàn giao.
+> **Giai đoạn hiện tại**: **Giai đoạn 8 (hoàn thiện và bàn giao) đang tiến hành** — Giai đoạn 0–7 đã xong: backend có đủ nghiệp vụ (thuốc, lịch, lần uống, thông báo, người thân) + **API vận hành** + **158 test**; `web/` có 8 màn hình M01–M08 **đã nối API thật**, đăng nhập Firebase thật, Web Push code + cấu hình xong, **khu vực vận hành `/admin`**. Còn lại: 2 kịch bản push cần thiết bị thật (N7 iOS, N12 2 tài khoản), kiểm thử tay vận hành (A8–A20) và bàn giao.
 
 ## Quyết định đã đổi (19/10/2026)
 
@@ -34,25 +34,27 @@ Kiểm tra: `GET http://localhost:3000/health`
 ### Kiểm thử
 
 ```bash
-npm test        # 146 test (mongodb-memory-server: nghiệp vụ + API tích hợp + hồ sơ SĐT/địa chỉ + quản trị)
+npm test        # 158 test (mongodb-memory-server: nghiệp vụ + API tích hợp + hồ sơ SĐT/địa chỉ + vận hành)
 npm run lint    # typecheck
 ```
 
 Ghi chú test: chạy trên mongodb-memory-server (MongoDB trong bộ nhớ) để không phụ thuộc DB thật; nghiệp vụ (máy trạng thái, idempotency, phân quyền) giống hệt môi trường production.
 
-### Quản trị hệ thống (`/admin`)
+### Khu vực vận hành (`/admin`)
 
-Khu vực hậu trường **ngoài M01–M08** (không phải màn hình M09). Chỉ tài khoản `users.role='admin'` mới vào được; người dùng thường nhận 403.
+Khu vực hậu trường **ngoài M01–M08** (không phải màn hình M09). Tài khoản `users.role='manager'` hoặc `'admin'` mới vào được; người dùng thường nhận 403.
 
-- **Cấp admin đầu tiên** (sau khi tài khoản đã đăng nhập ứng dụng ít nhất một lần để có bản ghi trong MongoDB):
+- **Cấp quyền đầu tiên** (sau khi tài khoản đã đăng nhập ứng dụng ít nhất một lần để có bản ghi trong MongoDB):
 
   ```bash
   cd backend
-  npm run admin:grant -- ban@example.com   # hoặc: npm run admin:grant -- 0912345678
+  npm run admin:grant -- ban@example.com                 # mặc định admin
+  npm run admin:grant -- 0912345678 --role manager       # cấp quản lý
+  npm run role:set -- ban@example.com --role user        # hạ về người dùng
   ```
 
-  Sau đó tải lại web → nút “Quản trị hệ thống” hiện cố định ở đầu trang (không cần vào Cài đặt), hoặc mở thẳng `/admin`.
-- **Chức năng**: xem số liệu 24 giờ, tìm/phân trang người dùng, xem lỗi gửi push + nhật ký thao tác, **khóa/mở tài khoản**, **đặt lại mật khẩu**. Không hiển thị tên thuốc/lý do không uống.
+  Sau đó tải lại web → nút “Quản trị hệ thống” (admin) hoặc “Khu vận hành” (quản lý) hiện cố định ở đầu trang (không cần vào Cài đặt), hoặc mở thẳng `/admin`.
+- **Chức năng**: xem số liệu 24 giờ, tìm/phân trang người dùng, xem lỗi gửi push + nhật ký thao tác, **khóa/mở tài khoản**. Admin có thêm **đặt lại mật khẩu** và **đổi vai trò**. Quản lý chỉ khóa/mở tài khoản người dùng, không thao tác tài khoản quản lý/quản trị. Không hiển thị tên thuốc/lý do không uống.
 - **Khóa tài khoản** có hiệu lực ngay với API (backend kiểm tra `users.disabled_at`) và chặn đăng nhập lại qua Firebase. **Đặt lại mật khẩu** cần Firebase Admin đã cấu hình trong `backend/.env` (dùng cho tài khoản SĐT vì không nhận được email đặt lại).
 - **Chưa có xóa tài khoản** — chờ quyết định Q4 về lưu trữ/xóa dữ liệu (`docs/OPEN_QUESTIONS.md`).
 
@@ -117,16 +119,16 @@ Vite nạp `web/.env` tự động — **sửa `.env` xong phải dừng/chạy 
 
 ```bash
 npm run typecheck   # TypeScript strict
-npm test            # 164 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, quản trị /admin, push/messaging, SĐT/đăng nhập)
+npm test            # 168 test Vitest + React Testing Library (api client, validation M05, ngày/giờ/buổi, màn hình M01–M08, vận hành /admin, push/messaging, SĐT/đăng nhập)
 npm run lint        # oxlint
 ```
 
 ### Màn hình và điều hướng
 
-Đúng 8 màn hình M01–M08 trong `src/screens/` + luồng đăng nhập Email/Mật khẩu (`src/screens/Login/`), không thêm màn hình thứ 9. **Khu vực quản trị `/admin` là công cụ hậu trường ngoài M01–M08** (không phải M09), chỉ tài khoản `role='admin'` thấy. Admin có **nút “Quản trị hệ thống” cố định ở đầu trang** (không nằm trong M08).
+Đúng 8 màn hình M01–M08 trong `src/screens/` + luồng đăng nhập Email/Mật khẩu (`src/screens/Login/`), không thêm màn hình thứ 9. **Khu vực vận hành `/admin` là công cụ hậu trường ngoài M01–M08** (không phải M09), chỉ tài khoản `role='manager'` hoặc `'admin'` thấy. Admin có **nút “Quản trị hệ thống”**, quản lý có **nút “Khu vận hành”** cố định ở đầu trang (không nằm trong M08).
 
 - **Responsive mobile-first**: bottom tab bar ở viewport điện thoại (nút to, có nhãn chữ) cho 5 màn hình chính (M01, M03, M04, M06, M08); màn tác vụ tập trung (M02, M05, M07, Login) và `/admin` không hiện tab. Màn hình lớn chuyển nav ngang.
-- **Quản trị**: `/admin` có số liệu 24 giờ, danh sách người dùng (tìm/phân trang, số đếm — không nội dung y tế), lỗi gửi push, nhật ký; khóa/mở tài khoản + đặt lại mật khẩu. Cấp admin bằng `npm run admin:grant` (mục Backend ở trên).
+- **Vận hành**: `/admin` có số liệu 24 giờ, danh sách người dùng (tìm/phân trang, số đếm — không nội dung y tế), lỗi gửi push, nhật ký; quản lý khóa/mở tài khoản người dùng; admin thêm đặt lại mật khẩu và đổi vai trò. Cấp quyền bằng `/admin` hoặc `npm run admin:grant` / `npm run role:set` (mục Backend ở trên).
 - **Cỡ chữ trong M08 áp dụng thật** (component Text nhân fontSize theo preference; nút/ô giữ chiều cao ≥ 56px).
 - **Mất mạng**: dải báo đỏ trên đỉnh trang, tự kiểm tra `/health` mỗi 10 giây, tự tải lại khi có mạng; lỗi mạng không bị coi là hết hạn đăng nhập (chỉ 401/403 mới đăng xuất).
 - **Dữ liệu thật**: cả 8 màn hình đã nối API backend — M01 (`/doses/today` + xác nhận nhanh), M02 (`/doses/:id` + đã uống/nhắc lại/không thể uống), M03 (`/doses?date=`), M04 (`/medications` + ngừng thuốc), M05 (tạo/sửa thuốc + quản lý giờ uống), M06 (`/history` lọc + phân trang), M07 (`/family/*` mã mời, quyền xem, ngắt kết nối), M08 (tài khoản, cài đặt nhắc lại, âm thanh/giọng đọc, thông báo người thân).

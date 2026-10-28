@@ -20,7 +20,7 @@ Mọi mục dưới đây cần người dùng trả lời trước (hoặc tron
 |---|---|---|
 | Q9 | Quy tắc snooze “không vượt quá 23:59 giờ địa phương” chưa được cài? | **Đã cài 20/10/2026** (`snoozeDenyReason`, trả `409` nếu giờ nhắc lại sang ngày địa phương kế tiếp); có test B8 |
 | Q10 | M05 khi SỬA thuốc: API đã duyệt không có cách thêm/xóa một giờ trong lịch? | **Đã bổ sung 20/10/2026 theo duyệt của người dùng**: thêm `POST /medications/:id/schedules` và `DELETE /medications/schedules/:id` để sửa đầy đủ (đây là việc ngoài kế hoạch Giai đoạn 4, có test; xem API_SPEC 2.3–2.4) |
-| Q12 | Có nên có giao diện quản trị? Nếu có thì làm gì? | **Đã chốt và triển khai 20/10/2026**: khu vực `/admin` ngoài M01–M08 (không phải M09) — chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu; thêm `users.role` + `users.disabled_at`. Không xóa tài khoản (Q4) |
+| Q12 | Có nên có giao diện quản trị? Nếu có thì làm gì? | **Đã chốt và triển khai 20/10/2026, mở rộng 27/10/2026**: khu vực `/admin` ngoài M01–M08 (không phải M09) — manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đặt lại mật khẩu + đổi vai trò; thêm `users.role` (`user`/`manager`/`admin`) + `users.disabled_at`. Không xóa tài khoản (Q4) |
 
 ## Các câu hỏi đã đóng
 

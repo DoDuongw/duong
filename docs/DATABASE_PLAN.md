@@ -149,7 +149,7 @@ erDiagram
 | address | VARCHAR(200) | | Địa chỉ liên hệ trong hồ sơ (M08) — không bắt buộc |
 | timezone | VARCHAR(50) | default 'Asia/Ho_Chi_Minh' | Múi giờ hiển thị |
 | preferences | JSON | | Cỡ chữ, âm thanh, nhắc lại (M08). Hiện dùng: `snoozeMinutes` (5–30, mặc định 10), `snoozeMax` (1–5, mặc định 3) — backend tuân theo khi snooze |
-| role | ENUM('user','admin') | default 'user' | Vai trò hậu trường. `admin` mới được gọi `/api/v1/admin`; cấp bằng script `npm run admin:grant` (không có endpoint tự cấp) |
+| role | ENUM('user','manager','admin') | default 'user' | Vai trò hậu trường. `manager`/`admin` được gọi `/api/v1/admin`; chỉ `admin` đặt lại mật khẩu và đổi vai trò. Cấp/đổi bằng `/admin` (admin) hoặc script `npm run admin:grant` / `npm run role:set` (không có endpoint tự cấp) |
 | disabled_at | DATETIME | nullable, default null | `null` = đang hoạt động; có ngày = bị quản trị khóa. `authMiddleware` chặn mọi API bằng **403**; Firebase cũng đặt `disabled=true` để chặn đăng nhập lại |
 | created_at / updated_at | DATETIME | | UTC |
 
@@ -320,4 +320,4 @@ Phân biệt “đã gửi thông báo” với “người dùng đã xác nh�
 2. ENUM trạng thái lần uống: pending, confirmed, overdue, snoozed, missed, cannot_take.
 3. Chính sách lưu giữ ở mục 5 (phụ thuộc Q4).
 4. Mã mời lưu dạng băm SHA-256, không lưu mã thô.
-5. **Đã duyệt 20/10/2026**: thêm `users.role` + `users.disabled_at` cho khu vực quản trị; không thêm collection mới, không lưu email/mật khẩu trong MongoDB.
+5. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: thêm `users.role` (`user`/`manager`/`admin`) + `users.disabled_at` cho khu vực vận hành; không thêm collection mới, không lưu email/mật khẩu trong MongoDB.

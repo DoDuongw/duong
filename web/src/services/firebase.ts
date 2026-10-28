@@ -1,12 +1,15 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app';
+﻿import { initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   type Auth,
   type Unsubscribe,
+  type User,
 } from 'firebase/auth';
 import { firebaseConfig, isFirebaseConfigured } from '../config';
 import { normalizePhone, phoneToInternalEmail } from '../utils/phone';
@@ -21,7 +24,7 @@ if (isFirebaseConfigured) {
 
 export { isFirebaseConfigured };
 
-/** Trả về FirebaseApp đã khởi tạo (null nếu chưa cấu hình) — dùng cho Messaging (Web Push). */
+/** Trả về FirebaseApp đã khởi tạo (null nếu chưa cấu hình) */
 export function getFirebaseApp(): FirebaseApp | null {
   return app;
 }
@@ -33,46 +36,72 @@ function ensureAuth(): Auth {
   return auth;
 }
 
-/**
- * Người dùng gõ email hay số điện thoại?
- *
- * Firebase Spark plan không hỗ trợ Phone Auth (OTP SMS), nên SĐT được đăng nhập
- * qua **email nội bộ** `<sđt>@med.local` — với người dùng thì vẫn là "đăng nhập bằng SĐT".
- * Hàm này chuẩn hoá SĐT trước khi dựng email nên `091 234 5678` và `+84912345678`
- * cùng vào một tài khoản.
- */
 function toFirebaseEmail(identifier: string): string {
   const trimmed = identifier.trim();
   const asPhone = normalizePhone(trimmed);
   return asPhone ? phoneToInternalEmail(asPhone) : trimmed;
 }
 
+export function isInternalMedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return email.toLowerCase().endsWith('@med.local');
+}
+
 export async function signIn(identifier: string, password: string): Promise<void> {
   await signInWithEmailAndPassword(ensureAuth(), toFirebaseEmail(identifier), password);
 }
 
-export async function signUp(identifier: string, password: string): Promise<void> {
-  await createUserWithEmailAndPassword(ensureAuth(), toFirebaseEmail(identifier), password);
+export async function signUp(identifier: string, password: string): Promise<User> {
+  const cred = await createUserWithEmailAndPassword(ensureAuth(), toFirebaseEmail(identifier), password);
+  return cred.user;
 }
 
 export async function signOut(): Promise<void> {
   if (auth) await firebaseSignOut(auth);
 }
 
-/** Lấy Firebase ID token để gắn vào Authorization header (null nếu chưa cấu hình/đăng nhập) */
+export async function sendVerificationEmail(user?: User | null): Promise<void> {
+  const current = user ?? auth?.currentUser;
+  if (!current) throw new Error('Không có người dùng đang đăng nhập');
+  if (isInternalMedEmail(current.email)) return;
+  await sendEmailVerification(current);
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  await sendVerificationEmail(auth?.currentUser);
+}
+
+export async function sendPasswordReset(identifier: string): Promise<void> {
+  const email = toFirebaseEmail(identifier);
+  if (isInternalMedEmail(email)) {
+    const err = new Error('Tài khoản đăng ký bằng số điện thoại không thể tự khôi phục qua email. Vui lòng liên hệ quản trị viên để được hỗ trợ đặt lại mật khẩu.');
+    (err as Error & { code?: string }).code = 'auth/phone-account-reset-not-allowed';
+    throw err;
+  }
+  await sendPasswordResetEmail(ensureAuth(), email);
+}
+
+export async function reloadCurrentUser(): Promise<User | null> {
+  const current = auth?.currentUser;
+  if (!current) return null;
+  await current.reload();
+  return auth.currentUser;
+}
+
 export async function getIdToken(): Promise<string | null> {
   if (!auth?.currentUser) return null;
   return auth.currentUser.getIdToken();
 }
 
 export function onAuthChange(
-  callback: (user: { uid: string; email: string } | null) => void,
+  callback: (user: { uid: string; email: string; emailVerified: boolean } | null) => void,
 ): Unsubscribe {
-  if (!auth) {
+  const authInstance = auth;
+  if (authInstance === null) {
     callback(null);
     return () => undefined;
   }
-  return onAuthStateChanged(auth, (user) => {
-    callback(user ? { uid: user.uid, email: user.email ?? '' } : null);
+  return onAuthStateChanged(authInstance!, (user) => {
+    callback(user ? { uid: user.uid, email: user.email ?? '', emailVerified: user.emailVerified } : null);
   });
 }

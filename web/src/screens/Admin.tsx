@@ -12,6 +12,7 @@ import {
   getAdminSummary,
   getAdminUsers,
   setAdminUserDisabled,
+  setAdminUserRole,
 } from '../services/endpoints';
 import type {
   AdminAuditItem,
@@ -19,6 +20,7 @@ import type {
   AdminSummary,
   AdminUserItem,
   AdminUserPage,
+  UserRole,
 } from '../types';
 import { formatTimezoneLabel } from '../utils/dateTime';
 
@@ -36,6 +38,7 @@ const ACTION_LABEL: Record<string, string> = {
   admin_lock: 'Khóa tài khoản',
   admin_unlock: 'Mở khóa tài khoản',
   admin_reset_password: 'Đặt lại mật khẩu',
+  admin_set_role: 'Đổi vai trò',
   create: 'Tạo mới',
   update: 'Cập nhật',
   delete: 'Xóa',
@@ -57,6 +60,12 @@ const ENTITY_LABEL: Record<string, string> = {
   connection: 'Kết nối người thân',
   medication: 'Thuốc',
   schedule: 'Lịch uống thuốc',
+};
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  user: 'Người dùng',
+  manager: 'Quản lý',
+  admin: 'Quản trị',
 };
 
 const NOTIFICATION_ERROR_LABEL: Record<string, string> = {
@@ -116,21 +125,24 @@ function initials(user: AdminUserItem): string {
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.status === 403) return 'Tài khoản của bạn không có quyền quản trị.';
+    if (err.status === 403) return 'Tài khoản của bạn không có quyền thực hiện thao tác này.';
     return err.message;
   }
   return 'Không tải được dữ liệu. Kiểm tra kết nối mạng rồi thử lại.';
 }
 
 /**
- * Khu vực quản trị (route /admin) — KHÔNG phải màn hình M09.
+ * Khu vực vận hành (route /admin) — KHÔNG phải màn hình M09.
  *
- * Chỉ đọc + khóa/mở tài khoản + đặt lại mật khẩu. Không hiển thị nội dung y tế
- * (tên thuốc, lý do không uống) để giảm rủi ro riêng tư.
+ * Quản lý: xem số liệu/danh sách, khóa/mở tài khoản người dùng.
+ * Quản trị: thêm đặt lại mật khẩu và đổi vai trò.
+ * Không hiển thị nội dung y tế (tên thuốc, lý do không uống) để giảm rủi ro riêng tư.
  */
 export function Admin() {
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
+  const role = profile?.role;
+  const isAdmin = role === 'admin';
+  const canAccess = role === 'admin' || role === 'manager';
 
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [users, setUsers] = useState<AdminUserPage | null>(null);
@@ -151,6 +163,9 @@ export function Admin() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [roleTarget, setRoleTarget] = useState<AdminUserItem | null>(null);
+  const [nextRole, setNextRole] = useState<UserRole>('user');
+  const [roleError, setRoleError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const loadSummary = useCallback(async () => {
@@ -187,10 +202,10 @@ export function Admin() {
   }, [loadSummary, loadUsers, q, page]);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- tải dữ liệu quản trị khi mở trang
+    if (!canAccess) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- tải dữ liệu vận hành khi mở trang
     void loadAll();
-  }, [isAdmin, loadAll]);
+  }, [canAccess, loadAll]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -275,6 +290,33 @@ export function Admin() {
     }
   }
 
+  function openRole(user: AdminUserItem) {
+    setRoleTarget(user);
+    setNextRole(user.role);
+    setRoleError(null);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function submitRole(event: React.FormEvent) {
+    event.preventDefault();
+    if (!roleTarget) return;
+    setBusy(true);
+    setRoleError(null);
+    try {
+      await setAdminUserRole(roleTarget.id, nextRole);
+      setNotice(
+        `Đã đổi vai trò của ${displayName(roleTarget)} thành “${ROLE_LABEL[nextRole]}”. Người dùng cần tải lại trang để thấy thay đổi.`,
+      );
+      setRoleTarget(null);
+      await refresh();
+    } catch (err) {
+      setRoleError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!profile) {
     return (
       <main className="page page--task admin-page">
@@ -285,12 +327,12 @@ export function Admin() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canAccess) {
     return (
       <main className="page page--task admin-page">
         <div className="admin-denied">
           <p className="admin-eyebrow">Quyền truy cập</p>
-          <h1>Quản trị hệ thống</h1>
+          <h1>Khu vực vận hành</h1>
           <Notice tone="error">Tài khoản của bạn không có quyền truy cập khu vực này.</Notice>
           <Link to="/" className="admin-back">
             ← Về trang chủ
@@ -308,9 +350,11 @@ export function Admin() {
       <header className="admin-head">
         <div className="admin-head__main">
           <p className="admin-eyebrow">Khu vực vận hành</p>
-          <h1>Quản trị hệ thống</h1>
+          <h1>{isAdmin ? 'Quản trị hệ thống' : 'Khu vực vận hành'}</h1>
           <p className="admin-head__desc">
-            Theo dõi hoạt động, khóa tài khoản và đặt lại mật khẩu. Không hiển thị nội dung y tế chi tiết.
+            {isAdmin
+              ? 'Theo dõi hoạt động, khóa tài khoản, đặt lại mật khẩu và phân quyền. Không hiển thị nội dung y tế chi tiết.'
+              : 'Theo dõi hoạt động và khóa/mở tài khoản người dùng. Không hiển thị nội dung y tế chi tiết.'}
           </p>
         </div>
         <div className="admin-head__actions">
@@ -459,6 +503,7 @@ export function Admin() {
                         </div>
                         <div className="admin-user__badges">
                           {user.role === 'admin' && <span className="badge badge--admin">Quản trị</span>}
+                          {user.role === 'manager' && <span className="badge badge--manager">Quản lý</span>}
                           {user.disabled ? (
                             <span className="badge badge--locked">Đã khóa</span>
                           ) : (
@@ -493,20 +538,38 @@ export function Admin() {
                         </p>
 
                         <div className="admin-user__actions">
-                          <Button
-                            variant={user.disabled ? 'secondary' : 'danger'}
-                            onClick={() => setLockTarget(user)}
-                            aria-label={`${user.disabled ? 'Mở khóa' : 'Khóa'} tài khoản ${displayName(user)}`}
-                          >
-                            {user.disabled ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            onClick={() => openReset(user)}
-                            aria-label={`Đặt lại mật khẩu cho ${displayName(user)}`}
-                          >
-                            Đặt lại mật khẩu
-                          </Button>
+                          {(isAdmin ? user.id !== profile.id : user.role === 'user') && (
+                            <Button
+                              variant={user.disabled ? 'secondary' : 'danger'}
+                              onClick={() => setLockTarget(user)}
+                              aria-label={`${user.disabled ? 'Mở khóa' : 'Khóa'} tài khoản ${displayName(user)}`}
+                            >
+                              {user.disabled ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button
+                              variant="secondary"
+                              onClick={() => openReset(user)}
+                              aria-label={`Đặt lại mật khẩu cho ${displayName(user)}`}
+                            >
+                              Đặt lại mật khẩu
+                            </Button>
+                          )}
+                          {isAdmin && user.id !== profile.id && (
+                            <Button
+                              variant="secondary"
+                              onClick={() => openRole(user)}
+                              aria-label={`Đổi vai trò cho ${displayName(user)}`}
+                            >
+                              Đổi vai trò
+                            </Button>
+                          )}
+                          {!isAdmin && user.role !== 'user' && (
+                            <span className="admin-user__meta">
+                              Chỉ quản trị viên mới thao tác được tài khoản này.
+                            </span>
+                          )}
                         </div>
                       </div>
                     </li>
@@ -695,6 +758,60 @@ export function Admin() {
                 </Button>
                 <Button type="submit" loading={busy}>
                   Đặt lại mật khẩu
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {roleTarget && (
+        <div className="modal-backdrop" onClick={() => !busy && setRoleTarget(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-role-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal__head">
+              <h2 className="modal__title" id="admin-role-title">
+                Đổi vai trò
+              </h2>
+              <button
+                type="button"
+                className="modal__close"
+                aria-label="Đóng"
+                onClick={() => !busy && setRoleTarget(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="muted">Tài khoản: {displayName(roleTarget)}</p>
+            <form onSubmit={submitRole} className="stack">
+              <label>
+                Vai trò
+                <select
+                  className="select"
+                  value={nextRole}
+                  onChange={(event) => setNextRole(event.target.value as UserRole)}
+                >
+                  <option value="user">Người dùng</option>
+                  <option value="manager">Quản lý</option>
+                  <option value="admin">Quản trị</option>
+                </select>
+              </label>
+              <p className="muted admin-hint">
+                Quản lý xem số liệu và khóa/mở tài khoản người dùng. Quản trị có toàn quyền khu vực này. Cả hai đều
+                không xem nội dung y tế chi tiết.
+              </p>
+              {roleError && <Notice tone="error">{roleError}</Notice>}
+              <div className="admin-modal-actions">
+                <Button variant="ghost" onClick={() => setRoleTarget(null)} disabled={busy}>
+                  Hủy
+                </Button>
+                <Button type="submit" loading={busy}>
+                  Lưu vai trò
                 </Button>
               </div>
             </form>

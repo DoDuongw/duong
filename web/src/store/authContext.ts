@@ -4,6 +4,7 @@ import type { UserProfile } from '../types';
 export interface AuthUser {
   uid: string;
   email: string;
+  emailVerified: boolean;
 }
 
 export interface AuthContextValue {
@@ -30,6 +31,12 @@ export interface AuthContextValue {
   clearError: () => void;
   /** Tải lại hồ sơ backend (sau khi PATCH /users/me ở M08) */
   refreshProfile: () => Promise<void>;
+  /** Gửi lại email xác minh (chỉ áp dụng email thật) */
+  resendVerification: () => Promise<void>;
+  /** Làm mới trạng thái emailVerified từ Firebase */
+  reloadUser: () => Promise<void>;
+  /** Gửi email đặt lại mật khẩu */
+  sendPasswordReset: (identifier: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

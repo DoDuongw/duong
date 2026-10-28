@@ -8,30 +8,30 @@ import { Text } from '../components/Text';
 import { useAuth } from '../store/authContext';
 import { isValidAddress, isValidPhone, looksLikePhone } from '../utils/phone';
 
-/** Nội dung giới thiệu — công dụng, tiện ích và lợi ích của ứng dụng. */
+/** Nội dung giới thiệu ứng dụng */
 const FEATURES = [
   {
-    icon: '⏰',
+    icon: '💊',
     title: 'Nhắc đúng giờ, không bỏ sót',
-    body: 'Đặt nhiều giờ uống trong ngày theo đơn của bác sĩ. Đến giờ, ứng dụng nhắc trên điện thoại và máy tính — kèm tên thuốc và liều lượng.',
+    body: 'Đặt nhiều giờ uống trong ngày theo đơn của bác sĩ. Đơn giản, dùng trên điện thoại và máy tính để theo dõi thuốc và liều lượng.',
   },
   {
     icon: '✅',
-    title: 'Chỉ một nút bấm là xong',
-    body: 'Chữ lớn, tương phản cao, nút bấm to. Nhấn “Đã uống thuốc” là ghi nhận ngay, không cần gõ gì.',
+    title: 'Chỉ mất một nút để xong',
+    body: 'Chữ lớn, phân trang cao, nút to. Khi đến giờ uống thuốc chỉ cần ghi nhận ngay, không cần gõ gì.',
   },
   {
-    icon: '🔁',
+    icon: '⏰',
     title: 'Nhắc lại nếu chưa uống',
-    body: 'Nếu chưa xác nhận, ứng dụng tự nhắc lại sau ít phút (số phút và số lần do bạn chỉnh trong phần Cài đặt).',
+    body: 'Nếu chưa xác nhận, ứng dụng sẽ nhắc lại sau ít phút (số phút và số lần do bạn chỉnh trong phần Cài đặt).',
   },
   {
-    icon: '👨‍👩‍👧',
+    icon: '👨‍👩‍👦',
     title: 'Người thân cùng theo dõi',
-    body: 'Người thân nhập mã 6 chữ số để xem lịch uống thuốc qua mạng. Nếu bạn quên uống, họ nhận được thông báo để nhắc bạn.',
+    body: 'Người thân nhập mã 6 chữ số để xem lịch uống thuốc qua mạng. Nếu bạn quên uống, họ sẽ nhận được thông báo để nhắc bạn.',
   },
   {
-    icon: '🗓️',
+    icon: '📅',
     title: 'Lịch và lịch sử đầy đủ',
     body: 'Xem lịch từng ngày theo buổi sáng/trưa/chiều/tối, và tra lại lịch sử đã uống hay bỏ lỡ trong quá khứ.',
   },
@@ -44,7 +44,7 @@ const FEATURES = [
 
 const BENEFITS = [
   'Không lo quên liều hoặc uống trùng liều',
-  'Người thân yên tâm dù ở xa',
+  'Người thân yên tâm dù xa',
   'Không cần cài ứng dụng: mở bằng trình duyệt là dùng được',
   'Có thể thêm vào màn hình chính điện thoại như một ứng dụng',
 ];
@@ -57,19 +57,6 @@ const STEPS = [
 
 type AuthMode = 'login' | 'register';
 
-/**
- * Trang chủ (giới thiệu) của ứng dụng.
- *
- * Là cửa vào của ứng dụng (bước hệ thống trước M01, không nằm trong
- * danh sách màn hình M01–M08 của INTERFACE_SPEC): phần đầu giới thiệu
- * công dụng – tiện ích – lợi ích; khi người dùng bấm “Đăng nhập” hoặc
- * “Đăng ký”, form đăng nhập/đăng ký hiện ra **giữa màn hình** dưới
- * dạng hộp thoại (dialog).
- *
- * Đăng nhập dùng **một ô nhập chung**: gõ email thì đăng nhập bằng email,
- * gõ số điện thoại thì đăng nhập bằng SĐT (SĐT đi qua email nội bộ
- * `<sđt>@med.local` vì Firebase Spark plan không có Phone Auth OTP SMS).
- */
 export function Login() {
   const { configured, error, login, register, clearError } = useAuth();
   const navigate = useNavigate();
@@ -86,8 +73,11 @@ export function Login() {
     address?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotId, setForgotId] = useState('');
+  const [forgotSending, setForgotSending] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState<string | null>(null);
 
-  /** Mở hộp thoại đăng nhập/đăng ký ở giữa màn hình. */
   function openAuth(next: AuthMode) {
     setMode(next);
     clearError();
@@ -107,7 +97,6 @@ export function Login() {
     setFieldError({});
   }
 
-  /** Kiểm tra đầu vào theo chế độ đang chọn — dùng chung cho cả hai chế độ */
   function validateFields(): { identifier?: string; password?: string; phone?: string; address?: string } {
     const errors: { identifier?: string; password?: string; phone?: string; address?: string } = {};
     const value = identifier.trim();
@@ -122,7 +111,6 @@ export function Login() {
 
     if (password.length < 6) errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
 
-    // Chỉ đăng ký mới có SĐT/địa chỉ — không bắt buộc, nhưng nhập thì phải đúng
     if (mode === 'register') {
       if (phone.trim() !== '' && !isValidPhone(phone)) {
         errors.phone = 'Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678)';
@@ -154,7 +142,7 @@ export function Login() {
       }
       navigate('/', { replace: true });
     } catch {
-      // lỗi đã lưu trong auth context → hiển thị ở dưới form
+      // lỗi đã lưu trong auth context và hiển thị dưới form
     } finally {
       setSubmitting(false);
     }
@@ -162,13 +150,10 @@ export function Login() {
 
   return (
     <div className="landing">
-      {/* ---------------- Thanh đầu trang ---------------- */}
       <header className="site-header">
         <div className="site-header__inner">
           <span className="brand">
-            <span className="brand__mark" aria-hidden="true">
-              💊
-            </span>
+            <span className="brand__mark" aria-hidden="true">💊</span>
             <span className="brand__text">Nhắc lịch uống thuốc</span>
           </span>
           <div className="site-header__actions">
@@ -178,23 +163,22 @@ export function Login() {
             <Button aria-label="Mở đăng ký" onClick={() => openAuth('register')}>
               Đăng ký
             </Button>
-          </div>        </div>
+          </div>
+        </div>
       </header>
 
       <div className="landing__inner">
-        {/* ---------------- Giới thiệu ---------------- */}
         <section className="hero">
           <div className="hero__content">
-            <span className="hero__badge">Ứng dụng miễn phí · dùng trên trình duyệt</span>
+            <span className="hero__badge">Ứng dụng miễn phí dùng trên trình duyệt</span>
             <h1 className="hero__title">Nhắc lịch uống thuốc cho người cao tuổi</h1>
             <p className="hero__lead">
-              Giúp người cao tuổi uống thuốc đúng giờ, đúng liều; đồng thời để người thân theo dõi từ xa và
-              nhận thông báo khi có liều bị bỏ lỡ.
+              Giúp người cao tuổi uống thuốc đúng giờ, đúng liều; đồng thời để người thân theo dõi từ xa và nhận thông báo khi có liều bỏ lỡ.
             </p>
             <div className="hero__actions">
               <Button onClick={() => openAuth('register')}>Bắt đầu — tạo tài khoản</Button>
               <Button variant="secondary" onClick={() => openAuth('login')}>
-                Tôi đã có tài khoản
+                Đã có tài khoản
               </Button>
             </div>
           </div>
@@ -206,7 +190,7 @@ export function Login() {
             <div className="hero__preview-time">07:00</div>
             <div className="hero__preview-name">Amlodipine 5mg</div>
             <div className="hero__preview-row">
-              <span aria-hidden="true">🌅</span> Buổi sáng · sau ăn
+              <span aria-hidden="true">🍽️</span> Buổi sáng sau ăn
             </div>
             <div className="hero__preview-row">
               <span aria-hidden="true">✅</span> Đã uống lúc 07:02
@@ -220,76 +204,57 @@ export function Login() {
             <span className="trust__label">bước để bắt đầu</span>
           </div>
           <div className="trust">
-            <span className="trust__value">24/7</span>
-            <span className="trust__label">nhắc đúng giờ</span>
+            <span className="trust__value">8</span>
+            <span className="trust__label">màn hình dễ dùng</span>
           </div>
           <div className="trust">
-            <span className="trust__value">0đ</span>
-            <span className="trust__label">không mất phí</span>
-          </div>
-          <div className="trust">
-            <span className="trust__value">4</span>
-            <span className="trust__label">buổi theo dõi mỗi ngày</span>
+            <span className="trust__value">PWA</span>
+            <span className="trust__label">thêm vào màn hình chính</span>
           </div>
         </div>
 
-        <section aria-labelledby="cong-dung-title" style={{ marginBottom: 28 }}>
-          <h2 id="cong-dung-title" className="section-title" style={{ fontSize: 'calc(24px * var(--font-mult))' }}>
-            <span className="section-title__icon" aria-hidden="true">
-              🎯
-            </span>
-            Công dụng và tiện ích
-          </h2>
+        <section className="section">
+          <header className="section__head">
+            <p className="section__kicker">Tính năng</p>
+            <h2 className="section__title">Được thiết kế cho người cao tuổi</h2>
+            <p className="section__desc">Chữ lớn, nút to, ít thao tác, dễ đọc ở mọi cỡ màn hình.</p>
+          </header>
           <div className="feature-grid">
-            {FEATURES.map((feature) => (
-              <article className="feature" key={feature.title}>
-                <span className="feature__icon" aria-hidden="true">
-                  {feature.icon}
-                </span>
-                <h3>{feature.title}</h3>
-                <p className="muted" style={{ margin: 0, fontSize: 'calc(17px * var(--font-mult))' }}>
-                  {feature.body}
-                </p>
+            {FEATURES.map((f) => (
+              <article key={f.title} className="feature-card">
+                <span className="feature-card__icon" aria-hidden="true">{f.icon}</span>
+                <h3 className="feature-card__title">{f.title}</h3>
+                <p className="feature-card__body">{f.body}</p>
               </article>
             ))}
           </div>
         </section>
 
-        <section aria-labelledby="loi-ich-title" style={{ marginBottom: 28 }}>
-          <h2 id="loi-ich-title" className="section-title" style={{ fontSize: 'calc(24px * var(--font-mult))' }}>
-            <span className="section-title__icon" aria-hidden="true">
-              💚
-            </span>
-            Lợi ích khi sử dụng
-          </h2>
-          <div className="card">
-            <ul className="plain-list" style={{ fontSize: 'calc(18px * var(--font-mult))' }}>
-              {BENEFITS.map((benefit) => (
-                <li key={benefit}>{benefit}</li>
+        <section className="section section--split">
+          <div className="split">
+            <div>
+              <p className="section__kicker">Lợi ích</p>
+              <h2 className="section__title">An tâm hơn cho cả hai thế hệ</h2>
+              <ul className="benefit-list">
+                {BENEFITS.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+              <div className="split__actions">
+                <Button onClick={() => openAuth('register')}>Tạo tài khoản miễn phí</Button>
+              </div>
+            </div>
+            <div className="steps">
+              {STEPS.map((s) => (
+                <article key={s.title} className="step-card">
+                  <span className="step-card__num" aria-hidden="true">{s.icon}</span>
+                  <div>
+                    <h3 className="step-card__title">{s.title}</h3>
+                    <p className="step-card__body">{s.body}</p>
+                  </div>
+                </article>
               ))}
-            </ul>
-          </div>
-        </section>
-
-        <section aria-labelledby="cach-dung-title" style={{ marginBottom: 32 }}>
-          <h2 id="cach-dung-title" className="section-title" style={{ fontSize: 'calc(24px * var(--font-mult))' }}>
-            <span className="section-title__icon" aria-hidden="true">
-              🚀
-            </span>
-            Bắt đầu trong 3 bước
-          </h2>
-          <div className="feature-grid">
-            {STEPS.map((step) => (
-              <article className="feature" key={step.title}>
-                <span className="feature__icon" aria-hidden="true">
-                  {step.icon}
-                </span>
-                <h3>{step.title}</h3>
-                <p className="muted" style={{ margin: 0 }}>
-                  {step.body}
-                </p>
-              </article>
-            ))}
+            </div>
           </div>
         </section>
 
@@ -298,7 +263,6 @@ export function Login() {
         </footer>
       </div>
 
-      {/* ---------------- Hộp thoại đăng nhập / đăng ký (giữa màn hình) ---------------- */}
       {authOpen && (
         <div
           className="modal-backdrop"
@@ -313,15 +277,13 @@ export function Login() {
                 {mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
               </h2>
               <button type="button" className="modal__close" aria-label="Đóng" onClick={closeAuth}>
-                ✕
+                ×
               </button>
             </div>
 
             {!configured ? (
-              <Notice tone="warning" icon="⚙️">
-                <Text strong as="span">
-                  Chưa cấu hình Firebase.
-                </Text>{' '}
+              <Notice tone="warning" icon="⚠️">
+                <Text strong as="span">Chưa cấu hình Firebase.</Text>{' '}
                 Điền các biến <code>VITE_FIREBASE_*</code> vào <code>web/.env</code> (xem README) rồi chạy lại.
               </Notice>
             ) : (
@@ -351,8 +313,8 @@ export function Login() {
                       mode === 'login'
                         ? looksLikePhone(identifier)
                           ? 'Đăng nhập bằng số điện thoại'
-                          : 'Nhập email hoặc số điện thoại đều được'
-                        : 'Dùng để đăng nhập về sau (email hoặc số điện thoại)'
+                          : 'Nhập email hoặc số điện thoại đã dùng'
+                        : 'Dùng để đăng nhập sau (email hoặc số điện thoại)'
                     }
                     autoComplete="username"
                     placeholder="ten@vi-du.com hoặc 0912345678"
@@ -372,6 +334,17 @@ export function Login() {
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     required
                   />
+                  {mode === 'login' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -6, marginBottom: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => { setForgotOpen(true); setForgotId(identifier); setForgotMsg(null); clearError(); }}
+                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--c-primary)', fontWeight: 600, cursor: 'pointer', fontSize: 'calc(15px * var(--font-mult))' }}
+                      >
+                        Quên mật khẩu?
+                      </button>
+                    </div>
+                  )}
                   {mode === 'register' && (
                     <>
                       <TextField
@@ -384,7 +357,7 @@ export function Login() {
                           clearError();
                         }}
                         error={fieldError.phone}
-                        hint="Dùng để người thân liên hệ và hiện trong kết nối gia đình"
+                        hint="Dùng để người thân liên hệ và hiển thị trong kết nối gia đình"
                         autoComplete="tel"
                         placeholder="0912345678"
                       />
@@ -435,6 +408,65 @@ export function Login() {
                 </p>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {forgotOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) { setForgotOpen(false); setForgotMsg(null); }
+          }}
+        >
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
+            <div className="modal__head">
+              <h2 id="forgot-title" className="modal__title">Khôi phục mật khẩu</h2>
+              <button type="button" className="modal__close" aria-label="Đóng" onClick={() => { setForgotOpen(false); setForgotMsg(null); }}>×</button>
+            </div>
+            <p className="muted" style={{ marginTop: 0 }}>Nhập email hoặc số điện thoại đã dùng để đăng ký.</p>
+            <TextField
+              id="forgot-id"
+              label="Email hoặc số điện thoại"
+              type="text"
+              value={forgotId}
+              onChange={(v) => { setForgotId(v); setForgotMsg(null); clearError(); }}
+              autoComplete="username"
+              placeholder="ten@vi-du.com hoặc 0912345678"
+            />
+            {forgotMsg && (
+              <Notice tone={forgotMsg.includes('không thể') ? 'warning' : 'success'} icon={false}>
+                {forgotMsg}
+              </Notice>
+            )}
+            {error && <Notice tone="error" icon={false}>{error}</Notice>}
+            <Button
+              type="button"
+              block
+              loading={forgotSending}
+              onClick={async () => {
+                setForgotSending(true);
+                setForgotMsg(null);
+                clearError();
+                try {
+                  const { sendPasswordReset } = await import('../services/firebase');
+                  await sendPasswordReset(forgotId);
+                  setForgotMsg('Đã gửi email đặt lại mật khẩu. Vui lòng kiểm tra hộp thư (cả thư rác/spam).');
+                } catch (e) {
+                  const msg = (e as Error).message || '';
+                  if (msg.includes('không thể')) {
+                    setForgotMsg(msg);
+                  } else {
+                    setForgotMsg('Nếu email/số điện thoại này đã đăng ký, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.');
+                  }
+                } finally {
+                  setForgotSending(false);
+                }
+              }}
+            >
+              Gửi email đặt lại mật khẩu
+            </Button>
           </div>
         </div>
       )}

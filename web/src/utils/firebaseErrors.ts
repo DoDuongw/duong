@@ -1,4 +1,6 @@
-/** Dịch mã lỗi Firebase Auth sang thông báo tiếng Việt dễ hiểu (người cao tuổi / người thân) */
+/**
+ * Dịch mã lỗi Firebase Auth sang thông báo tiếng Việt dễ hiểu (người cao tuổi / người thân)
+ */
 
 const MESSAGES: Record<string, string> = {
   'auth/invalid-credential': 'Email hoặc mật khẩu không đúng',
@@ -8,11 +10,12 @@ const MESSAGES: Record<string, string> = {
   'auth/email-already-in-use': 'Email này đã được đăng ký — hãy đăng nhập',
   'auth/weak-password': 'Mật khẩu quá yếu (tối thiểu 6 ký tự)',
   'auth/too-many-requests': 'Thử quá nhiều lần — vui lòng đợi vài phút rồi thử lại',
-  'auth/network-request-failed': 'Không kết nối được tới Firebase — kiểm tra mạng',
+  'auth/network-request-failed': 'Không kết nối được đến Firebase — kiểm tra mạng',
   'auth/operation-not-allowed': 'Chưa bật đăng nhập Email/Mật khẩu trong Firebase Console',
   'auth/configuration-not-found': 'Firebase chưa bật đăng nhập Email/Mật khẩu (Authentication → Sign-in method)',
   'auth/user-disabled': 'Tài khoản này đã bị khóa',
   'auth/missing-password': 'Vui lòng nhập mật khẩu',
+  'auth/phone-account-reset-not-allowed': 'Tài khoản đăng ký bằng số điện thoại không thể tự khôi phục qua email. Vui lòng liên hệ quản trị viên để được hỗ trợ đặt lại mật khẩu.',
 };
 
 export function firebaseAuthMessage(error: unknown): string {
