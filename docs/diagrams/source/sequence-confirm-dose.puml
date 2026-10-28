@@ -1,0 +1,27 @@
+@startuml
+title Trinh tu xac nhan da uong thuoc
+autonumber
+actor "Nguoi cao tuoi" as User
+participant "Web React / M02" as Web
+participant "Express API" as API
+participant "authMiddleware" as Auth
+participant "Dose service / model" as Dose
+database "MongoDB" as DB
+User -> Web: Nhan nut Da uong thuoc
+Web -> API: POST /api/v1/doses/{id}/confirm + clientRequestId
+API -> Auth: Xac minh Firebase ID token
+Auth --> API: UID nguoi dung
+API -> Dose: Kiem tra chu ho so va trang thai
+Dose -> DB: Cap nhat lan uong theo dieu kien trang thai
+alt Cung clientRequestId da xu ly truoc do
+ DB --> Dose: Tra ket qua da luu
+ Dose --> API: Ket qua idempotent
+else Lan uong hop le
+ DB --> Dose: Lan uong da cap nhat
+ Dose --> API: Trang thai confirmed
+else Khong co quyen hoac trang thai khong hop le
+ Dose --> API: Loi 403 / 404 / 409
+end
+API --> Web: JSON thanh cong hoac loi
+Web --> User: Cap nhat trang thai va thong ke
+@enduml
