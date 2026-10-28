@@ -1,0 +1,36 @@
+@startuml
+title Dieu huong M01-M08 va khu van hanh
+left to right direction
+skinparam shadowing false
+rectangle "Xac thuc he thong" as Login
+rectangle "M01 Trang chu" as M01
+rectangle "M02 Nhac uong thuoc" as M02
+rectangle "M03 Lich uong thuoc" as M03
+rectangle "M04 Danh sach thuoc" as M04
+rectangle "M05 Them / sua thuoc" as M05
+rectangle "M06 Lich su" as M06
+rectangle "M07 Nguoi than" as M07
+rectangle "M08 Ca nhan / cai dat" as M08
+rectangle "Khu van hanh /admin" as Admin
+Login --> M01 : token hop le va sync profile
+M01 --> M02 : thuoc tiep theo / push
+M01 --> M03 : lich hom nay
+M01 --> M07 : nguoi than
+M03 --> M02 : chon lan uong
+M03 --> M04 : xem thuoc
+M04 --> M05 : them / sua
+M05 --> M04 : luu thanh cong
+M02 --> M03 : quay lai lich
+M01 --> M06 : lich su
+M01 --> M08 : ca nhan
+M07 --> M03 : xem lich chu ho so
+M07 --> M04 : xem thuoc chu ho so
+Admin ..> M01 : quay ve ung dung
+note bottom of Admin
+Chi role manager/admin.
+La khu hau truong, khong phai M09.
+end note
+note bottom of M02
+Nguoi than chi xem: khong hien nut thao tac lan uong.
+end note
+@enduml
