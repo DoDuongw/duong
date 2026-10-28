@@ -1,0 +1,35 @@
+@startuml
+title Canh bao nguoi than khi lan uong chua duoc xac nhan
+autonumber
+participant "node-cron scheduler" as Cron
+participant "notificationService" as Service
+database "MongoDB" as DB
+participant "Firebase Admin / FCM" as FCM
+participant "Service Worker" as SW
+actor "Nguoi than" as Relative
+Cron -> Service : Moi phut quet lan uong qua nguong
+Service -> DB : Tim dose chua xac nhan va qua han cuoi
+DB --> Service : Dose + owner + snoozed_until
+Service -> DB : Tim connection active voi relative_alerts=true
+DB --> Service : Ket noi va thiet bi active
+Service -> DB : Kiem tra notification_logs chong trung
+alt Da gui hoac dose da ket thuc
+  Service -> Service : Bo qua
+else Canh bao can gui
+  Service -> FCM : Gui data-only push den token nguoi than
+  alt FCM gui thanh cong
+    FCM --> Service : Message ID
+    Service -> DB : Ghi notification log sent
+    FCM -> SW : Push event
+    SW -> Relative : Hien thi thong bao
+  else FCM loi
+    FCM --> Service : Loi
+    Service -> DB : Ghi log that bai / danh dau token neu het han
+  end
+end
+note over Cron,Relative
+Nguong mac dinh 15 phut sau gio den han cuoi
+(snoozed_until neu da nhac lai).
+Moi dose chi gui mot canh bao.
+end note
+@enduml
