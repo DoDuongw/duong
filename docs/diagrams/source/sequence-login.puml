@@ -1,0 +1,24 @@
+@startuml
+title Trinh tu dang nhap
+autonumber
+actor "Nguoi dung" as User
+participant "Web React" as Web
+participant "Firebase Auth" as Auth
+participant "Backend Express" as API
+database "MongoDB" as DB
+User -> Web: Nhap email va mat khau
+Web -> Auth: Dang nhap email/mat khau
+alt Thong tin khong hop le
+ Auth --> Web: Loi xac thuc
+ Web --> User: Hien thi loi
+else Xac thuc thanh cong
+ Auth --> Web: Firebase ID token
+ Web -> API: POST /api/v1/users/me/sync
+ API -> Auth: Xac minh ID token (Firebase Admin)
+ Auth --> API: UID da xac minh
+ API -> DB: Tim hoac tao/cap nhat user theo firebase_uid
+ DB --> API: Ho so va role
+ API --> Web: JSON ho so
+ Web --> User: Hien thi trang chu
+end
+@enduml
