@@ -1,0 +1,33 @@
+@startuml
+title May trang thai mot lan uong thuoc
+hide empty description
+[*] --> pending : Sinh tu lich
+pending --> confirmed : Chu ho so xac nhan
+pending --> snoozed : Nhac lai sau
+snoozed --> snoozed : Nhac lai tiep / con gioi han
+snoozed --> confirmed : Chu ho so xac nhan
+pending --> cannot_take : Khong the uong / co ly do
+snoozed --> cannot_take : Khong the uong / co ly do
+overdue --> cannot_take : Khong the uong / co ly do
+pending --> overdue : Qua nguong overdue
+snoozed --> overdue : Qua nguong overdue
+overdue --> confirmed : Xac nhan trong cung ngay / muon
+pending --> missed : Qua han missed hoac het ngay
+snoozed --> missed : Het ngay
+overdue --> missed : Qua han missed hoac het ngay
+confirmed --> [*]
+cannot_take --> [*]
+missed --> [*]
+note right of confirmed
+Trang thai ket thuc.
+Khong duoc ghi de lich su.
+end note
+note right of snoozed
+So lan va khoang cach theo M08 preferences.
+Khong cho phep nhac lai vuot gioi han ngay.
+end note
+note bottom
+Confirm dung atomic update va clientRequestId de chong gui lap.
+Nguoi than chi xem, khong the thay chu ho so thao tac.
+end note
+@enduml
