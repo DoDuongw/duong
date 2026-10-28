@@ -1,0 +1,32 @@
+@startuml
+title Quan ly trang thai tai khoan
+autonumber
+actor "Quan ly / Admin" as Staff
+participant "Web admin" as Web
+participant "Express API" as API
+participant "Auth va phan quyen staff" as Auth
+participant "adminService" as Service
+participant "Firebase Admin" as Firebase
+database "MongoDB" as DB
+Staff -> Web : Chon khoa hoac mo khoa tai khoan
+Web -> API : PATCH /api/v1/admin/users/{id}/status
+API -> Auth : Xac minh token va vai tro
+Auth --> API : Ket qua phan quyen
+API -> Service : setUserDisabled(...)
+Service -> DB : Kiem tra tai khoan muc tieu
+alt Khong du quyen hoac tu khoa chinh minh
+ Service --> API : Loi 400/403
+else Hop le
+ Service -> Firebase : Cap nhat trang thai tai khoan
+ Firebase --> Service : Ket qua
+ Service -> DB : Cap nhat disabled_at va ghi audit log
+ Service --> API : Trang thai moi
+ API --> Web : JSON thanh cong
+ Web --> Staff : Cap nhat trang thai tren giao dien
+end
+note over Auth,DB
+Middleware chan API neu disabled_at co gia tri.
+Chi admin duoc doi vai tro hoac thuc hien tac vu quan tri nang cao.
+Khong ghi thong tin bi mat vao log.
+end note
+@enduml
