@@ -1,0 +1,30 @@
+@startuml
+title Trinh tu them thuoc va lich uong
+autonumber
+actor "Nguoi cao tuoi" as User
+participant "Web React" as Web
+participant "Express API" as API
+participant "authMiddleware" as Auth
+participant "familyAccess" as Access
+database "MongoDB / Mongoose" as DB
+User -> Web: Nhap thong tin thuoc va lich
+Web -> API: POST /api/v1/medications (Bearer token + JSON)
+API -> Auth: Xac minh token
+Auth --> API: UID nguoi dung
+API -> Access: resolveOwnerAccess(req, manage=true)
+Access --> API: ownerId hoac loi quyen
+API -> API: Validate Zod va ngay bat dau/ket thuc
+alt Du lieu khong hop le hoac khong du quyen
+ API --> Web: Loi 400 / 403
+ Web --> User: Hien thi loi
+else Hop le
+ API -> DB: Tao Medication
+ loop Moi lich trong request
+  API -> DB: Tao MedicationSchedule
+  API -> DB: Tao ScheduleVersion v1
+ end
+ API -> DB: Ghi AuditLog action=create
+ API --> Web: 201 + thuoc va lich
+ Web --> User: Hien thi thuoc vua them
+end
+@enduml
