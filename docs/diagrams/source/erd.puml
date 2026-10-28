@@ -1,0 +1,132 @@
+@startuml
+title Mo hinh du lieu logic (MongoDB collections)
+hide methods
+hide stereotypes
+skinparam linetype ortho
+skinparam shadowing false
+entity "users" as users {
+ * _id : ObjectId
+ --
+ firebase_uid : unique
+ phone
+ display_name
+ address
+ timezone
+ preferences
+ role : user/manager/admin
+ disabled_at
+}
+entity "medications" as meds {
+ * _id : ObjectId
+ --
+ user_id
+ name
+ dosage_text
+ instructions
+ start_date
+ end_date
+ status
+ created_by
+}
+entity "medicationschedules" as schedules {
+ * _id : ObjectId
+ --
+ medication_id
+ user_id
+ time_of_day
+ recurrence_rule
+ effective_from/to
+ status
+ current_version
+}
+entity "scheduleversions" as versions {
+ * _id : ObjectId
+ --
+ schedule_id
+ version
+ snapshot
+ changed_by
+}
+entity "doseoccurrences" as doses {
+ * _id : ObjectId
+ --
+ schedule_id
+ medication_id
+ user_id
+ scheduled_at
+ status
+ confirmed_at
+ snoozed_until
+ snooze_count
+ schedule_version
+ is_late_confirmation
+}
+entity "devices" as devices {
+ * _id : ObjectId
+ --
+ user_id
+ fcm_token : unique
+ platform
+ status
+ last_seen_at
+}
+entity "familyinvites" as invites {
+ * _id : ObjectId
+ --
+ owner_id
+ code_hash : SHA-256
+ expires_at
+ status
+}
+entity "familyconnections" as connections {
+ * _id : ObjectId
+ --
+ owner_id
+ relative_id
+ invite_id
+ status
+ permissions
+ connected_at
+ revoked_at
+}
+entity "notificationlogs" as nlogs {
+ * _id : ObjectId
+ --
+ dose_id
+ device_id
+ channel
+ kind
+ sent_at
+ status
+ error
+}
+entity "auditlogs" as audits {
+ * _id : ObjectId
+ --
+ user_id
+ entity
+ entity_id
+ action
+ details
+ createdAt
+}
+users ||--o{ meds : owns
+meds ||--o{ schedules : has
+schedules ||--o{ versions : versioned_by
+schedules ||--o{ doses : generates
+meds ||--o{ doses : describes
+users ||--o{ doses : owns
+users ||--o{ devices : registers
+users ||--o{ invites : creates
+users ||--o{ connections : owner
+users ||--o{ connections : relative
+invites ||--o| connections : accepted_into
+doses ||--o{ nlogs : notified_by
+devices ||--o{ nlogs : receives
+users ||--o{ audits : actor
+note bottom
+Logical relationships; actual storage uses MongoDB ObjectId references.
+Standalone MongoDB MVP uses sequential writes for multi-collection medication creation,
+and atomic updates for dose state transitions.
+end note
+@enduml

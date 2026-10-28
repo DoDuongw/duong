@@ -1,0 +1,32 @@
+@startuml
+title Tao ma moi va ket noi nguoi than
+autonumber
+actor "Chu ho so" as Owner
+actor "Nguoi than" as Relative
+participant "Web M07" as Web
+participant "Express API" as API
+participant "familyRouter" as Family
+database "MongoDB" as DB
+Owner -> Web : Chon Tao ma moi
+Web -> API : POST /api/v1/family/invites
+API -> Family : Xac minh token va gioi han tao ma
+Family -> DB : Thu hoi ma pending cu
+Family -> Family : Tao ma 6 so, bam SHA-256, han 15 phut
+Family -> DB : Luu code_hash + expires_at + audit log
+API --> Web : Ma hien thi mot lan + expiresAt
+Relative -> Web : Nhap ma
+Web -> API : POST /api/v1/family/invites/{code}/accept
+API -> Family : Kiem tra dinh dang, hash, trang thai, han
+Family -> DB : Tim invite va kiem tra khong tu ket noi
+alt Ma khong hop le / het han / da dung
+  API --> Web : 400/404/409
+else Ma hop le
+  Family -> DB : Tao connection active voi permissions mac dinh
+  Family -> DB : Danh dau invite accepted + audit log
+  API --> Web : 201 connection + permissions
+end
+note over Family,DB
+Ma moi co han 15 phut va chi luu hash.
+Quyen duoc kiem tra lai o backend moi request.
+end note
+@enduml

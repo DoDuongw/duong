@@ -1,0 +1,51 @@
+@startuml
+title Kien truc tong the MedReminder
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+package "Web PWA (React + Vite + TypeScript)" {
+  [M01-M08] as Screens
+  [Firebase Auth SDK] as WebAuth
+  [FCM Web SDK] as WebFCM
+  [Service Worker] as SW
+  [API client] as Client
+  Screens --> Client
+  Screens --> WebAuth
+  Screens --> WebFCM
+  SW --> Screens : notification click / deep link
+}
+package "Backend (Node.js + Express + TypeScript)" {
+  [API routes] as Routes
+  [Auth middleware] as AuthMW
+  [Family access middleware] as FamilyMW
+  [Business services] as Services
+  [node-cron scheduler] as Cron
+  [Firebase Admin SDK] as AdminSDK
+  Routes --> AuthMW
+  AuthMW --> FamilyMW
+  FamilyMW --> Services
+  Cron --> Services
+  Services --> AdminSDK
+}
+database "MongoDB / Mongoose" as DB
+cloud "Firebase Authentication" as FirebaseAuth
+cloud "Firebase Cloud Messaging" as FCM
+Client --> Routes : HTTPS JSON + Bearer ID token
+WebAuth --> FirebaseAuth
+AuthMW --> AdminSDK : verify ID token
+AdminSDK --> FirebaseAuth
+WebFCM --> FCM : register web token
+AdminSDK --> FCM : send Web Push
+FCM --> SW : push event
+Services --> DB
+note right of Cron
+Single-instance MVP.
+Runs every minute to generate doses,
+process reminders, overdue and relative alerts.
+end note
+note bottom of Screens
+Responsive mobile-first PWA.
+Health scope = medication adherence only;
+no diagnosis or medical advice.
+end note
+@enduml
