@@ -1,0 +1,31 @@
+@startuml
+title Trinh tu gui thong bao nhac uong thuoc
+autonumber
+participant "node-cron (moi phut)" as Cron
+participant "Dose / Notification jobs" as Jobs
+database "MongoDB" as DB
+participant "Firebase Admin / FCM" as FCM
+participant "Service Worker" as SW
+actor "Nguoi dung" as User
+Cron -> Jobs: Chay job theo lich
+Jobs -> DB: Tim lich den han / sinh lan uong
+DB --> Jobs: Lich va lan uong phu hop
+Jobs -> DB: Doc token thiet bi va trang thai gui
+DB --> Jobs: Token FCM
+Jobs -> FCM: Gui Web Push
+alt FCM chap nhan
+ FCM --> Jobs: Message ID
+ Jobs -> DB: Ghi ket qua gui
+ FCM -> SW: Push event
+ SW -> User: Hien thi notification
+ User -> SW: Nhan thong bao
+ SW -> SW: Mo chi tiet lan uong M02
+else Gui that bai
+ FCM --> Jobs: Loi gui
+ Jobs -> DB: Ghi loi de theo doi van hanh
+end
+note over Cron,FCM
+Backend lap lich tap trung. Thoi diem hien thi thuc te phu thuoc
+mang, trinh duyet va dich vu push.
+end note
+@enduml
