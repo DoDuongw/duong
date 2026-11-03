@@ -168,6 +168,7 @@ export interface AdminUserItem {
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  emailVerified: boolean;
   role: UserRole;
   disabled: boolean;
   timezone: string;

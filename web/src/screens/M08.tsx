@@ -79,6 +79,7 @@ export function M08() {
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
   const [address, setAddress] = useState(profile?.address ?? '');
+  const [dateOfBirth, setDateOfBirth] = useState(profile?.dateOfBirth ?? '');
   const [timezone, setTimezone] = useState(ctxTimezone);
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
@@ -110,6 +111,7 @@ export function M08() {
     setDisplayName(profile?.displayName ?? '');
     setPhone(profile?.phone ?? '');
     setAddress(profile?.address ?? '');
+    setDateOfBirth(profile?.dateOfBirth ?? '');
     setTimezone(profile?.timezone ?? ctxTimezone);
     setSnoozeMinutes(Number(profile?.preferences?.snoozeMinutes ?? 10));
     setSnoozeMax(Number(profile?.preferences?.snoozeMax ?? 3));
@@ -183,7 +185,7 @@ export function M08() {
     setAccountError(null);
     setAccountMessage(null);
     try {
-      await updateProfile({
+      await updateProfile({ dateOfBirth: dateOfBirth || undefined,
         displayName: name,
         // '' → null để xoá hẳn giá trị đã lưu
         phone: phoneValue === '' ? null : phoneValue,
@@ -310,6 +312,19 @@ export function M08() {
               placeholder="12 Lê Lợi, Q.1, TP.HCM"
               onChange={(e) => setAddress(e.target.value)}
             />
+            <label style={{ display: 'block', marginTop: 12, marginBottom: 6, fontWeight: 600 }} htmlFor="accountDob">
+              Ngày sinh
+            </label>
+            <input
+              id="accountDob"
+              className="input"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+            />
+            <Text muted style={{ marginTop: 4 }}>
+              Bắt buộc. Ngày sinh không được lớn hơn ngày hiện tại.
+            </Text>
             <label style={{ display: 'block', marginTop: 12, marginBottom: 6, fontWeight: 600 }} htmlFor="timezone">
               Múi giờ
             </label>

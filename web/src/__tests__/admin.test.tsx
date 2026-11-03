@@ -72,7 +72,7 @@ function profile(role: UserRole = 'admin'): UserProfile {
 function authValue(role: UserRole = 'admin'): AuthContextValue {
   return {
     initializing: false,
-    user: { uid: 'uid', email: 'admin@example.com' },
+    user: { uid: 'uid', email: 'admin@example.com', emailVerified: true },
     profile: profile(role),
     timezone: 'Asia/Ho_Chi_Minh',
     phone: null,
@@ -83,6 +83,9 @@ function authValue(role: UserRole = 'admin'): AuthContextValue {
     logout: vi.fn(),
     clearError: vi.fn(),
     refreshProfile: vi.fn(),
+        resendVerification: vi.fn(),
+        reloadUser: vi.fn(),
+        sendPasswordReset: vi.fn(),
   };
 }
 

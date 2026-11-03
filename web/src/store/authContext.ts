@@ -25,7 +25,7 @@ export interface AuthContextValue {
   register: (
     identifier: string,
     password: string,
-    profile?: { phone?: string; address?: string; displayName?: string },
+    profile?: { phone?: string; address?: string; displayName?: string; dateOfBirth?: string },
   ) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;

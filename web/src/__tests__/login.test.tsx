@@ -41,13 +41,11 @@ beforeEach(() => {
 });
 
 describe('Trang giới thiệu + đăng nhập (R4)', () => {
-  it('hiện phần giới thiệu: công dụng, tiện ích và lợi ích', () => {
+  it('hiển thị phần giới thiệu: công dụng, tiện ích và lợi ích', () => {
     renderLogin();
 
     expect(screen.getByRole('heading', { name: /Nhắc lịch uống thuốc/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Công dụng và tiện ích/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: //An tâm hơn cho cả hai thế hệ/
-    expect(screen.getByRole('heading', { name: //Tạo tài khoản miễn phí/
+    expect(screen.getByRole('heading', { name: /Được thiết kế cho người cao tuổi/ })).toBeInTheDocument();
     expect(screen.getByText(/Người thân cùng theo dõi/)).toBeInTheDocument();
   });
 

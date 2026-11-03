@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (
       identifier: string,
       password: string,
-      extra?: { phone?: string; address?: string; displayName?: string },
+      extra?: { phone?: string; address?: string; displayName?: string; dateOfBirth?: string },
     ) => {
       setError(null);
       try {
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // Không chặn đăng ký nếu không gửi được email xác minh
         }
-        await loadProfile(extra);
+        await loadProfile(extra as any);
       } catch (e) {
         setError(firebaseAuthMessage(e));
         throw e;

@@ -118,7 +118,7 @@ const today: TodayDoses = {
 function authValue(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
   return {
     initializing: false,
-    user: { uid: 'u1', email: 'lan@example.com' },
+    user: { uid: 'u1', email: 'lan@example.com', emailVerified: true },
     profile: {
       id: 'p1',
       phone: null,
@@ -136,6 +136,7 @@ function authValue(overrides: Partial<AuthContextValue> = {}): AuthContextValue 
     logout: vi.fn(),
     clearError: vi.fn(),
     refreshProfile: vi.fn(),
+    resendVerification: vi.fn() as any, reloadUser: vi.fn() as any, sendPasswordReset: vi.fn() as any,
     ...overrides,
   };
 }

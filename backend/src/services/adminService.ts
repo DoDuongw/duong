@@ -1,12 +1,16 @@
 import type { FilterQuery } from 'mongoose';
 import { User, UserDoc, UserRole } from '../models/User';
 import { Medication } from '../models/Medication';
+import { MedicationSchedule } from '../models/MedicationSchedule';
 import { DoseOccurrence } from '../models/DoseOccurrence';
 import { FamilyConnection } from '../models/FamilyConnection';
+import { FamilyInvite } from '../models/FamilyInvite';
 import { Device } from '../models/Device';
 import { NotificationLog } from '../models/NotificationLog';
 import { AuditLog } from '../models/AuditLog';
 import {
+  deleteFirebaseUser,
+  getFirebaseUserDetails,
   getFirebaseUserEmails,
   isFirebaseReady,
   revokeFirebaseRefreshTokens,
@@ -76,6 +80,7 @@ export interface AdminUserItem {
   displayName: string | null;
   phone: string | null;
   email: string | null;
+  emailVerified: boolean;
   role: UserRole;
   disabled: boolean;
   timezone: string;
@@ -155,11 +160,17 @@ export async function listUsers(input: {
 
   // Email không lưu trong MongoDB (Firebase giữ) — lấy 1 lần cho cả trang.
   let emails: Record<string, string | null> = {};
+  let verified: Record<string, boolean> = {};
   if (isFirebaseReady()) {
     try {
-      emails = await getFirebaseUserEmails(rows.map((u) => u.firebase_uid));
+      const details = await getFirebaseUserDetails(rows.map((u) => u.firebase_uid));
+      for (const [uid, v] of Object.entries(details)) {
+        emails[uid] = v.email;
+        verified[uid] = v.emailVerified;
+      }
     } catch {
-      emails = {}; // Firebase lỗi không được làm hỏng trang chỉ đọc
+      emails = {};
+      verified = {};
     }
   }
 
@@ -171,6 +182,7 @@ export async function listUsers(input: {
         displayName: u.display_name,
         phone: u.phone,
         email: emails[u.firebase_uid] ?? null,
+        emailVerified: verified[u.firebase_uid] ?? false,
         role: u.role ?? 'user',
         disabled: Boolean(u.disabled_at),
         timezone: u.timezone,
@@ -360,4 +372,62 @@ export async function setUserRole(
   });
 
   return { id: String(user._id), role };
+}
+
+/** Xóa vĩnh viễn tài khoản người dùng (chỉ admin). Chỉ xóa tài khoản role = 'user'. Không tự xóa chính mình. Không xóa tài khoản admin/manager khác. */
+export async function deleteUserPermanently(
+  adminId: string,
+  targetId: string,
+  actorRole: UserRole,
+): Promise<{ id: string; deleted: true }> {
+  if (actorRole !== 'admin') throw forbidden('Chỉ quản trị viên mới có quyền xóa tài khoản');
+  if (adminId === targetId) throw badRequest('Không thể xóa chính mình');
+
+  const user = await User.findById(targetId);
+  if (!user) throw notFound('Không tìm thấy người dùng');
+
+  if (user.role === 'admin' || user.role === 'manager') {
+    throw badRequest('Không thể xóa tài khoản quản trị hoặc quản lý');
+  }
+  if ((user.role ?? 'user') !== 'user') {
+    throw badRequest('Chỉ có thể xóa tài khoản người dùng');
+  }
+
+  const uid = String(user._id);
+
+  await DoseOccurrence.deleteMany({ user_id: uid });
+  await MedicationSchedule.deleteMany({ user_id: uid });
+  await Medication.deleteMany({ user_id: uid });
+  await Device.deleteMany({ user_id: uid });
+  await FamilyInvite.deleteMany({ $or: [{ inviter_id: uid }, { invitee_id: uid }, { owner_id: uid }] });
+  await FamilyConnection.deleteMany({ $or: [{ owner_id: uid }, { relative_id: uid }] });
+  await NotificationLog.deleteMany({ user_id: uid });
+
+  await AuditLog.create({
+    user_id: targetId,
+    entity: 'user',
+    entity_id: targetId,
+    action: 'admin_delete_user',
+    details: { admin_id: adminId },
+  });
+
+  try {
+    if (user.firebase_uid && isFirebaseReady()) {
+      try {
+        await revokeFirebaseRefreshTokens(user.firebase_uid);
+      } catch {
+        // ignore
+      }
+      try {
+        await deleteFirebaseUser(user.firebase_uid);
+      } catch {
+        // ignore - không để việc xóa Firebase chặn xóa dữ liệu MongoDB
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  await User.deleteOne({ _id: targetId });
+  return { id: targetId, deleted: true };
 }

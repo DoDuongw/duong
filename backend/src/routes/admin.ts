@@ -18,6 +18,7 @@ import {
   resetUserPassword,
   setUserDisabled,
   setUserRole,
+  deleteUserPermanently,
 } from '../services/adminService';
 
 /**
@@ -115,6 +116,15 @@ router.patch(
     }
   },
 );
+
+router.delete('/users/:id', requireAdminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const actorRole = currentUserRole(req) ?? 'user';
+    ok(res, await deleteUserPermanently(currentUserId(req), targetUserId(req), actorRole));
+  } catch (e) {
+    next(e);
+  }
+});
 
 const limitSchema = z.object({ limit: z.coerce.number().int().min(1).max(100).optional() });
 

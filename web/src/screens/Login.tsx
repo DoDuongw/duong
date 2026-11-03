@@ -66,11 +66,14 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [fieldError, setFieldError] = useState<{
     identifier?: string;
     password?: string;
+    confirm?: string;
     phone?: string;
     address?: string;
+    dateOfBirth?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -97,8 +100,8 @@ export function Login() {
     setFieldError({});
   }
 
-  function validateFields(): { identifier?: string; password?: string; phone?: string; address?: string } {
-    const errors: { identifier?: string; password?: string; phone?: string; address?: string } = {};
+  function validateFields(): { identifier?: string; password?: string; phone?: string; address?: string; dateOfBirth?: string } {
+    const errors: { identifier?: string; password?: string; phone?: string; address?: string; dateOfBirth?: string } = {};
     const value = identifier.trim();
 
     if (value === '') {
@@ -112,6 +115,17 @@ export function Login() {
     if (password.length < 6) errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
 
     if (mode === 'register') {
+      if (!dateOfBirth) {
+        errors.dateOfBirth = 'Vui lòng nhập ngày sinh';
+      } else {
+        const d = new Date(dateOfBirth);
+        if (Number.isNaN(d.getTime())) errors.dateOfBirth = 'Ngày sinh không hợp lệ';
+        else if (d > new Date()) errors.dateOfBirth = 'Ngày sinh không hợp lệ';
+        else {
+          const age = (Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000);
+          if (age < 0 || age > 120) errors.dateOfBirth = 'Ngày sinh không hợp lệ';
+        }
+      }
       if (phone.trim() !== '' && !isValidPhone(phone)) {
         errors.phone = 'Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678)';
       }
@@ -138,6 +152,7 @@ export function Login() {
         await register(value, password, {
           phone: phone.trim() === '' ? undefined : phone.trim(),
           address: address.trim() === '' ? undefined : address.trim(),
+          dateOfBirth,
         });
       }
       navigate('/', { replace: true });
@@ -374,6 +389,19 @@ export function Login() {
                         hint="Địa chỉ liên hệ, lưu trong hồ sơ của bạn"
                         autoComplete="street-address"
                         placeholder="12 Lê Lợi, Q.1, TP.HCM"
+                      />
+                      <TextField
+                        id="auth-dob"
+                        label="Ngày sinh"
+                        type="date"
+                        value={dateOfBirth}
+                        onChange={(v) => {
+                          setDateOfBirth(v);
+                          clearError();
+                        }}
+                        error={fieldError.dateOfBirth}
+                        hint="Bắt buộc"
+                        required
                       />
                     </>
                   )}

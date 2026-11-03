@@ -20,7 +20,7 @@ import type { DoseWithMedication, TodayDoses } from '../types';
 
 const authValue: AuthContextValue = {
   initializing: false,
-  user: { uid: 'u1', email: 'lan@example.com' },
+  user: { uid: 'u1', email: 'lan@example.com', emailVerified: true },
   profile: null,
   timezone: 'Asia/Ho_Chi_Minh',
   phone: null,
@@ -31,6 +31,9 @@ const authValue: AuthContextValue = {
   logout: vi.fn(),
   clearError: vi.fn(),
   refreshProfile: vi.fn(),
+    resendVerification: vi.fn(),
+    reloadUser: vi.fn(),
+    sendPasswordReset: vi.fn(),
 };
 
 const dose: DoseWithMedication = {

@@ -13,6 +13,7 @@ import {
   getAdminUsers,
   setAdminUserDisabled,
   setAdminUserRole,
+  deleteAdminUser,
 } from '../services/endpoints';
 import type {
   AdminAuditItem,
@@ -166,37 +167,35 @@ export function Admin() {
   const [roleTarget, setRoleTarget] = useState<AdminUserItem | null>(null);
   const [nextRole, setNextRole] = useState<UserRole>('user');
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUserItem | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (silent = false) => {
     try {
       setSummary(await getAdminSummary());
     } catch (err) {
-      setError(errorMessage(err));
+      if (!silent) setError(errorMessage(err));
     }
   }, []);
 
-  const loadUsers = useCallback(async (query: string, targetPage: number) => {
+  const loadUsers = useCallback(async (query: string, targetPage: number, silent = false) => {
     setLoadingUsers(true);
     try {
       setUsers(await getAdminUsers({ q: query || undefined, page: targetPage, pageSize: PAGE_SIZE }));
     } catch (err) {
-      setError(errorMessage(err));
+      if (!silent) setError(errorMessage(err));
     } finally {
       setLoadingUsers(false);
     }
   }, []);
 
   const loadAll = useCallback(async () => {
-    await Promise.all([
-      loadSummary(),
-      loadUsers(q, page),
-      getAdminNotifications(20)
-        .then(setNotifications)
-        .catch((err) => setError(errorMessage(err))),
-      getAdminAuditLogs(20)
-        .then(setAuditLogs)
-        .catch((err) => setError(errorMessage(err))),
+    await Promise.allSettled([
+      loadSummary(false),
+      loadUsers(q, page, false),
+      getAdminNotifications(20).then(setNotifications).catch(() => {}),
+      getAdminAuditLogs(20).then(setAuditLogs).catch(() => {}),
     ]);
     setLastUpdated(new Date());
   }, [loadSummary, loadUsers, q, page]);
@@ -312,6 +311,42 @@ export function Admin() {
       await refresh();
     } catch (err) {
       setRoleError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openDelete(user: AdminUserItem) {
+    setDeleteTarget(user);
+    setDeleteConfirm('');
+    setError(null);
+    setNotice(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    if (deleteConfirm.trim() !== 'XÓA') {
+      setError('Vui lòng nhập XÓA để xác nhận xóa vĩnh viễn tài khoản.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const target = deleteTarget;
+    try {
+      await deleteAdminUser(target.id);
+      setDeleteTarget(null);
+      setDeleteConfirm('');
+      setNotice(`Đã xóa vĩnh viễn tài khoản ${displayName(target)}. Hành động này không thể hoàn tác.`);
+      await Promise.allSettled([
+        loadUsers(q, page, true),
+        loadSummary(true),
+        getAdminAuditLogs(20).then(setAuditLogs).catch(() => {}),
+        getAdminNotifications(20).then(setNotifications).catch(() => {}),
+      ]);
+      setLastUpdated(new Date());
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -509,6 +544,9 @@ export function Admin() {
                           ) : (
                             <span className="badge badge--active">Đang hoạt động</span>
                           )}
+                          {user.email && !user.emailVerified && (
+                            <span className="badge" style={{ background: '#fff3cd', color: '#856404' }}>Chưa xác minh</span>
+                          )}
                         </div>
                       </div>
 
@@ -563,6 +601,15 @@ export function Admin() {
                               aria-label={`Đổi vai trò cho ${displayName(user)}`}
                             >
                               Đổi vai trò
+                            </Button>
+                          )}
+                          {isAdmin && user.id !== profile.id && user.role === 'user' && (
+                            <Button
+                              variant="danger"
+                              onClick={() => openDelete(user)}
+                              aria-label={`Xóa vĩnh viễn tài khoản ${displayName(user)}`}
+                            >
+                              Xóa tài khoản
                             </Button>
                           )}
                           {!isAdmin && user.role !== 'user' && (
@@ -815,6 +862,55 @@ export function Admin() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="modal-backdrop" onClick={() => !busy && setDeleteTarget(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-delete-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal__head">
+              <h2 className="modal__title" id="admin-delete-title">
+                Xóa vĩnh viễn tài khoản
+              </h2>
+              <button
+                type="button"
+                className="modal__close"
+                aria-label="Đóng"
+                onClick={() => !busy && setDeleteTarget(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <p>
+              Bạn có chắc chắn muốn <strong>xóa vĩnh viễn</strong> tài khoản <strong>{displayName(deleteTarget)}</strong>?
+              <br />
+              Hành động này <strong>không thể hoàn tác</strong>. Toàn bộ dữ liệu liên quan (thuốc, lịch, lịch sử uống, thiết bị, kết nối người thân) sẽ bị xóa.
+            </p>
+            <label className="stack">
+              <span className="muted">Nhập <strong>XÓA</strong> để xác nhận</span>
+              <input
+                className="input"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="XÓA"
+                autoComplete="off"
+              />
+            </label>
+            <div className="admin-modal-actions">
+              <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={busy}>
+                Hủy
+              </Button>
+              <Button variant="danger" onClick={confirmDelete} loading={busy} disabled={deleteConfirm.trim() !== 'XÓA'}>
+                Xác nhận xóa
+              </Button>
+            </div>
           </div>
         </div>
       )}

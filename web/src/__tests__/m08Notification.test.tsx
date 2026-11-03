@@ -29,7 +29,7 @@ import { AuthContext, type AuthContextValue } from '../store/authContext';
 
 const authValue: AuthContextValue = {
   initializing: false,
-  user: { uid: 'u1', email: 'lan@example.com' },
+  user: { uid: 'u1', email: 'lan@example.com', emailVerified: true },
   profile: {
     id: 'p1',
     phone: null,
@@ -47,6 +47,9 @@ const authValue: AuthContextValue = {
   logout: vi.fn(),
   clearError: vi.fn(),
   refreshProfile: vi.fn(),
+    resendVerification: vi.fn(),
+    reloadUser: vi.fn(),
+    sendPasswordReset: vi.fn(),
 };
 
 function renderM08() {

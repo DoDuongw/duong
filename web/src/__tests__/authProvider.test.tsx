@@ -56,7 +56,7 @@ function renderProvider() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(onAuthChange).mockImplementation((cb) => {
-    cb({ uid: 'u1', email: 'lan@example.com' });
+    cb({ uid: 'u1', email: 'lan@example.com', emailVerified: true });
     return () => {};
   });
 });

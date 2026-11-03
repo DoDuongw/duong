@@ -85,7 +85,7 @@ export async function reloadCurrentUser(): Promise<User | null> {
   const current = auth?.currentUser;
   if (!current) return null;
   await current.reload();
-  return auth.currentUser;
+  return auth?.currentUser ?? null;
 }
 
 export async function getIdToken(): Promise<string | null> {

@@ -51,6 +51,7 @@ export function syncProfile(input?: {
   phone?: string;
   address?: string;
   timezone?: string;
+  dateOfBirth?: string;
 }): Promise<UserProfile> {
   return apiFetch<UserProfile>('/users/me/sync', { method: 'POST', body: input ?? {} });
 }
@@ -235,9 +236,7 @@ export function adminResetPassword(id: string, password: string): Promise<{ id: 
   return apiFetch(`/admin/users/${id}/reset-password`, { method: 'POST', body: { password } });
 }
 
-export function setAdminUserRole(id: string, role: UserRole): Promise<{ id: string; role: UserRole }> {
-  return apiFetch(`/admin/users/${id}/role`, { method: 'PATCH', body: { role } });
-}
+
 
 export function getAdminNotifications(limit = 20): Promise<AdminFailedNotification[]> {
   return apiFetch<AdminFailedNotification[]>(`/admin/notifications${query({ limit })}`);
@@ -245,4 +244,17 @@ export function getAdminNotifications(limit = 20): Promise<AdminFailedNotificati
 
 export function getAdminAuditLogs(limit = 20): Promise<AdminAuditItem[]> {
   return apiFetch<AdminAuditItem[]>(`/admin/audit-logs${query({ limit })}`);
+}
+
+export function setAdminUserRole(id: string, role: UserRole): Promise<{ id: string; role: UserRole }> {
+  return apiFetch(`/admin/users/${id}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  }).then((res) => parseJson<{ data: { id: string; role: UserRole } }>(res).then((json) => json.data));
+}
+
+export function deleteAdminUser(id: string): Promise<{ id: string; deleted: true }> {
+  return apiFetch(`/admin/users/${id}`, {
+    method: 'DELETE',
+  }).then((res) => parseJson<{ data: { id: string; deleted: true } }>(res).then((json) => json.data));
 }

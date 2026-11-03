@@ -113,6 +113,8 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
       timezone: user!.timezone,
       preferences: user!.preferences,
       role: user!.role ?? 'user',
+      emailVerified: Boolean((user as any).email_verified_at),
+      dateOfBirth: (user as any).date_of_birth ? new Date((user as any).date_of_birth).toISOString().slice(0, 10) : null,
     });
   } catch (e) {
     next(e);
@@ -131,6 +133,8 @@ router.get('/me', requireAuthMiddleware, async (req: Request, res: Response, nex
       timezone: user.timezone,
       preferences: user.preferences,
       role: user.role ?? 'user',
+      emailVerified: Boolean((user as any).email_verified_at),
+      dateOfBirth: (user as any).date_of_birth ? new Date((user as any).date_of_birth).toISOString().slice(0, 10) : null,
     });
   } catch (e) {
     next(e);
@@ -143,6 +147,18 @@ const patchSchema = z.object({
   address: addressField.optional(),
   timezone: z.string().min(1).max(50).optional(),
   preferences: z.record(z.unknown()).optional(),
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .refine((v) => {
+      if (!v) return true;
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return false;
+      if (d > new Date()) return false;
+      const age = (Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000);
+      return age >= 0 && age <= 120;
+    }, 'Ngày sinh không hợp lệ'),
 });
 
 router.patch('/me', requireAuthMiddleware, async (req: Request, res: Response, next: NextFunction) => {
@@ -155,6 +171,7 @@ router.patch('/me', requireAuthMiddleware, async (req: Request, res: Response, n
     if (parsed.data.address !== undefined) updates.address = parsed.data.address;
     if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
     if (parsed.data.preferences !== undefined) updates.preferences = parsed.data.preferences;
+    if (parsed.data.dateOfBirth !== undefined) updates.date_of_birth = new Date(parsed.data.dateOfBirth);
 
     const user = await User.findByIdAndUpdate(currentUserId(req), updates, { new: true });
     if (!user) throw notFound('Không tìm thấy người dùng');
@@ -166,6 +183,8 @@ router.patch('/me', requireAuthMiddleware, async (req: Request, res: Response, n
       timezone: user.timezone,
       preferences: user.preferences,
       role: user.role ?? 'user',
+      emailVerified: Boolean((user as any).email_verified_at),
+      dateOfBirth: (user as any).date_of_birth ? new Date((user as any).date_of_birth).toISOString().slice(0, 10) : null,
     });
   } catch (e) {
     next(e);

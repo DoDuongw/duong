@@ -19,6 +19,10 @@ export interface UserDoc extends Document {
   role: UserRole;
   /** null = đang hoạt động; có ngày = bị quản trị khóa (không đăng nhập/gọi API được) */
   disabled_at: Date | null;
+  /** Ngày sinh (bắt buộc) */
+  date_of_birth: Date;
+  /** null = chưa xác minh email; có ngày = đã xác minh email */
+  email_verified_at: Date | null;
 }
 
 const userSchema = new Schema<UserDoc>(
@@ -31,6 +35,8 @@ const userSchema = new Schema<UserDoc>(
     preferences: { type: Schema.Types.Mixed, default: null },
     role: { type: String, enum: ['user', 'manager', 'admin'], default: 'user' },
     disabled_at: { type: Date, default: null },
+    date_of_birth: { type: Date, required: true },
+    email_verified_at: { type: Date, default: null },
   },
   { timestamps: true },
 );

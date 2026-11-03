@@ -36,7 +36,7 @@ import type { FamilyConnectionItem } from '../types';
 function makeAuth(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
   return {
     initializing: false,
-    user: { uid: 'u1', email: 'lan@example.com' },
+    user: { uid: 'u1', email: 'lan@example.com', emailVerified: true },
     profile: {
       id: 'p1',
       phone: null,

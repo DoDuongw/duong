@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import admin from 'firebase-admin';
 import { env } from './env';
+import { serviceUnavailable } from '../utils/errors';
 
 let initialized = false;
 
@@ -140,4 +141,44 @@ export async function getFirebaseUserEmails(uids: string[]): Promise<Record<stri
   for (const uid of batch) result[uid] = null;
   for (const user of found.users) result[user.uid] = user.email ?? null;
   return result;
+}
+
+export interface FirebaseUserDetail {
+  email: string | null;
+  emailVerified: boolean;
+}
+
+export async function getFirebaseUserDetails(uids: string[]): Promise<Record<string, FirebaseUserDetail>> {
+  const result: Record<string, FirebaseUserDetail> = {};
+  if (uids.length === 0) return result;
+  const auth = requireAuth();
+  const batch = uids.slice(0, 100);
+  for (const uid of batch) result[uid] = { email: null, emailVerified: false };
+  try {
+    const identifiers = batch.map((uid) => ({ uid }));
+    const found = await auth.getUsers(identifiers as any);
+    for (const user of found.users) {
+      result[user.uid] = { email: user.email ?? null, emailVerified: !!user.emailVerified };
+    }
+    for (const notFound of (found as any).notFound ?? []) {
+      if (notFound?.uid) {
+        result[notFound.uid] = { email: null, emailVerified: false };
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return result;
+}
+
+export async function deleteFirebaseUser(uid: string): Promise<void> {
+  const auth = requireAuth();
+  try {
+    await auth.deleteUser(uid);
+  } catch (err: any) {
+    if (err?.code === 'auth/user-not-found') {
+      return;
+    }
+    throw serviceUnavailable('Không thể xóa tài khoản xác thực Firebase');
+  }
 }
