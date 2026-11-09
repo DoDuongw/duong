@@ -78,7 +78,7 @@ export function getMessagingOrNull(): admin.messaging.Messaging | null {
   return admin.messaging();
 }
 
-export async function verifyIdToken(token: string): Promise<{ uid: string }> {
+export async function verifyIdToken(token: string): Promise<{ uid: string; emailVerified?: boolean }> {
   initFirebase();
   if (!initialized) {
     const err = new Error('Firebase Admin chưa được cấu hình');
@@ -86,7 +86,7 @@ export async function verifyIdToken(token: string): Promise<{ uid: string }> {
     throw err;
   }
   const decoded = await admin.auth().verifyIdToken(token);
-  return { uid: decoded.uid };
+  return { uid: decoded.uid, emailVerified: !!(decoded as any).email_verified };
 }
 
 /** Firebase Admin đã sẵn sàng chưa (đã nạp credentials) */

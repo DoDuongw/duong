@@ -9,13 +9,12 @@ import {
   requireStaffMiddleware,
 } from '../middlewares/auth';
 import { ok } from '../middlewares/errorHandler';
-import { badRequest, notFound } from '../utils/errors';
+import { badRequest, forbidden, notFound } from '../utils/errors';
 import {
   getSummary,
   listAuditLogs,
   listFailedNotifications,
   listUsers,
-  resetUserPassword,
   setUserDisabled,
   setUserRole,
   deleteUserPermanently,
@@ -80,24 +79,11 @@ router.patch('/users/:id/status', async (req: Request, res: Response, next: Next
   }
 });
 
-const resetPasswordSchema = z.object({
-  password: z
-    .string()
-    .min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự')
-    .max(128, 'Mật khẩu mới quá dài'),
-});
-
 router.post(
   '/users/:id/reset-password',
   requireAdminMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const parsed = resetPasswordSchema.safeParse(req.body ?? {});
-      if (!parsed.success) throw badRequest(parsed.error.errors.map((e) => e.message).join('; '));
-      ok(res, await resetUserPassword(currentUserId(req), targetUserId(req), parsed.data.password));
-    } catch (e) {
-      next(e);
-    }
+  async (_req: Request, _res: Response, next: NextFunction) => {
+    next(forbidden('Vì bảo mật, quản trị viên không được phép đổi/đặt lại mật khẩu của người dùng. Người dùng hãy tự đổi mật khẩu trong mục Hồ sơ/Cài đặt.'));
   },
 );
 

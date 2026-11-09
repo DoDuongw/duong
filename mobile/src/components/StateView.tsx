@@ -1,6 +1,7 @@
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../theme';
 import { Button } from './Button';
+import { Text } from './Text';
 
 interface StateViewProps {
   state: 'loading' | 'error' | 'empty';
@@ -26,6 +27,7 @@ export function StateView({ state, message, hint, emptyIcon, onRetry }: StateVie
         <Text style={styles.icon}>⚠️</Text>
         <Text style={styles.title}>Đã xảy ra lỗi</Text>
         {message ? <Text style={styles.muted}>{message}</Text> : null}
+        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
         {onRetry ? <Button onPress={onRetry} style={styles.btn}>Thử lại</Button> : null}
       </View>
     );
@@ -66,6 +68,12 @@ const styles = StyleSheet.create({
     ...typography.bodySm,
     color: colors.muted,
     textAlign: 'center',
+  },
+  hint: {
+    ...typography.bodySm,
+    color: colors.text,
+    textAlign: 'center',
+    marginTop: 2,
   },
   btn: {
     marginTop: spacing.md,

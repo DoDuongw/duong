@@ -1,10 +1,14 @@
 import { TextInput, TextInputProps, StyleSheet } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { useFontScale } from '../store/fontScale';
 
 export function Input(props: TextInputProps) {
+  const { multiplier } = useFontScale();
+  const fontSize = Math.round((typography.body.fontSize ?? 18) * multiplier);
+  const lineHeight = Math.round((typography.body.lineHeight ?? 28) * multiplier);
   return (
     <TextInput
-      style={[styles.input, props.style]}
+      style={[styles.input, { fontSize, lineHeight }, props.style]}
       placeholderTextColor={colors.muted}
       {...props}
     />
@@ -21,7 +25,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    ...typography.body,
     color: colors.text,
   },
 });
+

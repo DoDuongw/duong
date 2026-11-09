@@ -217,7 +217,8 @@ describe('GET /admin/users', () => {
     expect(res.body.data.items[0]).toMatchObject({
       displayName: 'Bà Lan',
       phone: '0900000001',
-      email: 'uid-owner@test.local',
+      email: null,
+      emailVerified: false,
       role: 'user',
       disabled: false,
       medicationsActive: 1,
@@ -375,46 +376,35 @@ describe('PATCH /admin/users/:id/status — khóa/mở tài khoản', () => {
 });
 
 describe('POST /admin/users/:id/reset-password', () => {
-  test('đặt lại mật khẩu: gọi Firebase, trả reset, không lưu mật khẩu ở DB/nhật ký', async () => {
+  test('bị chặn vì bảo mật: admin không được đặt lại mật khẩu người dùng', async () => {
     const admin = await createTestUser('uid-admin');
-    const target = await createTestUser('uid-target', '0900000002');
-    const password = 'mat-khau-moi-123';
-
-    const res = await request(app)
-      .post(`/api/v1/admin/users/${target.id}/reset-password`)
-      .set(as(admin.id, 'uid-admin'))
-      .send({ password });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ id: String(target.id), reset: true });
-    expect(mockSetPassword).toHaveBeenCalledWith('uid-target', password);
-    expect(mockRevoke).toHaveBeenCalledWith('uid-target');
-
-    const logs = await AuditLog.find({ action: 'admin_reset_password' }).lean();
-    expect(logs).toHaveLength(1);
-    expect(JSON.stringify(logs)).not.toContain(password);
-  });
-
-  test('mật khẩu dưới 8 ký tự → 400, không gọi Firebase', async () => {
-    const admin = await createTestUser('uid-admin');
+    admin.role = 'admin';
+    await admin.save();
     const target = await createTestUser('uid-target', '0900000002');
 
     const res = await request(app)
       .post(`/api/v1/admin/users/${target.id}/reset-password`)
-      .set(as(admin.id, 'uid-admin'))
-      .send({ password: '1234567' });
-
-    expect(res.status).toBe(400);
-    expect(mockSetPassword).not.toHaveBeenCalled();
-  });
-
-  test('người dùng không tồn tại → 404', async () => {
-    const admin = await createTestUser('uid-admin');
-    const res = await request(app)
-      .post(`/api/v1/admin/users/${new mongoose.Types.ObjectId()}/reset-password`)
-      .set(as(admin.id))
+      .set(as(admin.id, 'uid-admin', 'admin'))
       .send({ password: 'mat-khau-moi-123' });
-    expect(res.status).toBe(404);
+
+    expect(res.status).toBe(403);
+    expect(mockSetPassword).not.toHaveBeenCalled();
+    expect(mockRevoke).not.toHaveBeenCalled();
+  });
+
+  test('bị chặn: quản lý cũng không được đặt lại mật khẩu người dùng', async () => {
+    const manager = await createTestUser('uid-manager');
+    manager.role = 'manager';
+    await manager.save();
+    const target = await createTestUser('uid-target', '0900000002');
+
+    const res = await request(app)
+      .post(`/api/v1/admin/users/${target.id}/reset-password`)
+      .set(as(manager.id, 'uid-manager', 'manager'))
+      .send({ password: 'mat-khau-moi-123' });
+
+    expect(res.status).toBe(403);
+    expect(mockSetPassword).not.toHaveBeenCalled();
   });
 });
 

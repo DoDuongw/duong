@@ -58,7 +58,7 @@ class ApiClient {
       if (e instanceof ApiError) throw e;
       const err = e as AxiosError<any>;
       if (!err.response) {
-        throw new ApiError(0, "NETWORK_ERROR", "Không kết nối được máy chủ");
+        throw new ApiError(0, "NETWORK_ERROR", `Không kết nối được máy chủ (${API_BASE}). Kiểm tra backend đang chạy, IP LAN trong extra.API_BASE_URL, và chạy lại với npx expo start -c.`);
       }
       const json = err.response.data;
       const code = json?.error?.code ?? `HTTP_${err.response.status}`;

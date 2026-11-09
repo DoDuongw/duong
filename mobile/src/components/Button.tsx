@@ -1,20 +1,46 @@
+import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, TouchableOpacityProps, ActivityIndicator } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { useFontScale } from '../store/fontScale';
 
 interface ButtonProps extends TouchableOpacityProps {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'md' | 'lg';
   loading?: boolean;
-  children: string;
+  block?: boolean;
+  children: React.ReactNode;
 }
 
-export function Button({ variant = 'primary', size = 'lg', loading, disabled, children, style, ...props }: ButtonProps) {
+/** Normalize children so raw strings/numbers are never direct children of the pressable (RN View). */
+function renderChildren(children: React.ReactNode, textStyle: any): React.ReactNode {
+  if (children == null || typeof children === 'boolean') return null;
+  if (typeof children === 'string' || typeof children === 'number') {
+    return <Text style={textStyle}>{children}</Text>;
+  }
+  if (Array.isArray(children)) {
+    const nodes = children.map((child, i) => {
+      if (child == null || typeof child === 'boolean') return null;
+      if (typeof child === 'string' || typeof child === 'number') {
+        return <Text key={i} style={textStyle}>{child}</Text>;
+      }
+      return child;
+    });
+    return nodes;
+  }
+  return children;
+}
+
+export function Button({ variant = 'primary', size = 'lg', loading, block, disabled, children, style, ...props }: ButtonProps) {
+  const { multiplier } = useFontScale();
+  const fontSize = Math.round((typography.body.fontSize ?? 18) * multiplier);
+  const textStyle = [styles.text, styles[`${variant}Text` as const] as any, { fontSize }];
   return (
     <TouchableOpacity
       style={[
         styles.base,
         styles[variant],
         styles[size],
+        block && { alignSelf: 'stretch' },
         (disabled || loading) && styles.disabled,
         style,
       ]}
@@ -25,7 +51,7 @@ export function Button({ variant = 'primary', size = 'lg', loading, disabled, ch
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? '#fff' : colors.primary} />
       ) : (
-        <Text style={[styles.text, styles[`${variant}Text`]]}>{children}</Text>
+        renderChildren(children, textStyle)
       )}
     </TouchableOpacity>
   );

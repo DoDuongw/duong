@@ -22,7 +22,13 @@ export async function resetDb() {
 }
 
 export async function createTestUser(firebaseUid = 'test-uid-1', phone = '0900000001'): Promise<UserDoc> {
-  return User.create({ firebase_uid: firebaseUid, phone, display_name: 'Test', timezone: 'Asia/Ho_Chi_Minh' });
+  return User.create({
+    firebase_uid: firebaseUid,
+    phone,
+    display_name: 'Test',
+    timezone: 'Asia/Ho_Chi_Minh',
+    date_of_birth: new Date('1990-01-01'),
+  });
 }
 
 export async function createTestMedication(userId: string): Promise<MedicationDoc> {

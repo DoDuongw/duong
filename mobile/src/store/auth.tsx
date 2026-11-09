@@ -12,6 +12,7 @@ import {
   signOut as firebaseSignOut,
   signUp as firebaseSignUp,
 } from "../services/firebase";
+import { registerDevicePushToken } from "../services/notifications";
 import { AuthContext, type AuthContextValue, type AuthUser } from "./authContext";
 import { firebaseAuthMessage } from "../utils/firebaseErrors";
 import type { UserProfile } from "../types";
@@ -26,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const inflight = useRef<Promise<void> | null>(null);
 
-  const loadProfile = useCallback(async (seed?: { displayName?: string; phone?: string; address?: string }) => {
+  const loadProfile = useCallback(async (seed?: { displayName?: string; phone?: string; address?: string; dateOfBirth?: string; timezone?: string }) => {
     if (inflight.current) return inflight.current;
     const run = (async () => {
       try {
@@ -57,7 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setInitializing(false);
         return;
       }
-      void loadProfile().finally(() => setInitializing(false));
+      void loadProfile()
+        .then(() => {
+          void registerDevicePushToken();
+        })
+        .finally(() => setInitializing(false));
     });
     return unsubscribe;
   }, [loadProfile]);
@@ -68,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await firebaseSignIn(identifier, password);
         await loadProfile();
+        void registerDevicePushToken();
       } catch (e) {
         setError(firebaseAuthMessage(e));
         throw e;
@@ -90,7 +96,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // ignore
         }
-        await loadProfile(extra as any);
+        try {
+          setProfile(await syncProfile(extra as any));
+        } catch {
+          await loadProfile(extra as any);
+        }
+        void registerDevicePushToken();
       } catch (e) {
         setError(firebaseAuthMessage(e));
         throw e;
@@ -101,9 +112,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     setError(null);
-    await firebaseSignOut();
-    setUser(null);
-    setProfile(null);
+    try {
+      await firebaseSignOut();
+    } catch {
+      // clear local session even if remote sign-out fails
+    } finally {
+      setUser(null);
+      setProfile(null);
+    }
   }, []);
 
   const resendVerification = useCallback(async () => {
@@ -121,17 +137,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const refreshed = await reloadCurrentUser();
       if (refreshed) {
+        // Always construct a new object so React re-renders verification-dependent UI
         setUser({
           uid: refreshed.uid,
-          email: refreshed.email ?? user?.email ?? "",
-          emailVerified: refreshed.emailVerified,
+          email: refreshed.email ?? "",
+          emailVerified: !!refreshed.emailVerified,
         });
       }
     } catch (e) {
       setError(firebaseAuthMessage(e));
       throw e;
     }
-  }, [user?.email]);
+  }, []);
 
   const sendPasswordReset = useCallback(async (identifier: string) => {
     setError(null);

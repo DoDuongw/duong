@@ -68,7 +68,8 @@ const timeSchema = z.string().regex(/^\d{2}:\d{2}$/, 'Giờ phải dạng HH:mm'
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
-  imageUrl: z.string().max(500).optional(),
+  // URL dài (vd Firebase Storage có token) — chấp nhận string; có thể là URL http(s) hoặc data URI nhỏ nếu cần
+  imageUrl: z.string().max(2048).optional(),
   dosageText: z.string().max(200).optional(),
   instructions: z.string().max(2000).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

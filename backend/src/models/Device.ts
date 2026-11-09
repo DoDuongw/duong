@@ -4,7 +4,7 @@ import { objectId } from './schemaHelpers';
 export interface DeviceDoc extends Document {
   user_id: string;
   fcm_token: string;
-  platform: 'web';
+  platform: 'web' | 'android' | 'ios';
   user_agent: string | null;
   notifications_enabled: boolean;
   last_seen_at: Date | null;
@@ -15,7 +15,7 @@ const deviceSchema = new Schema<DeviceDoc>(
   {
     user_id: objectId({ ref: 'User', required: true, index: true }),
     fcm_token: { type: String, required: true, unique: true },
-    platform: { type: String, enum: ['web'], required: true },
+    platform: { type: String, enum: ['web', 'android', 'ios'], required: true },
     user_agent: { type: String, default: null },
     notifications_enabled: { type: Boolean, default: true },
     last_seen_at: { type: Date, default: null },

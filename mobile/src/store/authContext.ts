@@ -18,7 +18,7 @@ export type AuthContextValue = {
     extra?: { phone?: string; address?: string; displayName?: string; dateOfBirth?: string },
   ) => Promise<void>;
   logout: () => Promise<void>;
-  refreshProfile: (seed?: { displayName?: string; phone?: string; address?: string }) => Promise<void>;
+  refreshProfile: (seed?: { displayName?: string; phone?: string; address?: string; dateOfBirth?: string; timezone?: string }) => Promise<void>;
   clearError: () => void;
   resendVerification: () => Promise<void>;
   reloadUser: () => Promise<void>;

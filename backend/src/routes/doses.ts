@@ -8,6 +8,7 @@ import { currentTimezone, currentUserId, requireAuthMiddleware } from '../middle
 import { resolveOwnerAccess } from '../middlewares/familyAccess';
 import { badRequest, notFound } from '../utils/errors';
 import { confirmDose, snoozeDose, cannotTakeDose, generateUpcomingDoses } from '../services/doseService';
+import { notifyRelativeAlert, firebasePushSender } from '../services/notificationService';
 import { endOfLocalDayUtc, startOfLocalDayUtc, todayLocal } from '../utils/time';
 import { env } from '../config/env';
 
@@ -44,6 +45,7 @@ async function fetchDosesWithMedication(userId: string, from: Date, to: Date) {
     return {
       ...doseToJson(d),
       medicationName: med?.name ?? null,
+      imageUrl: med?.image_url ?? null,
       dosageText: med?.dosage_text ?? null,
       instructions: med?.instructions ?? null,
     };
@@ -131,6 +133,8 @@ router.post('/:id/cannot-take', async (req: Request, res: Response, next: NextFu
     if (!parsed.success) throw badRequest('Lý do không thể uống là bắt buộc (1–500 ký tự)');
     const dose = await cannotTakeDose(req.params.id, currentUserId(req), parsed.data.reason);
     ok(res, doseToJson(dose));
+    // Best-effort: báo người thân có bật cảnh báo (nếu FCM/kết nối khả dụng)
+    void notifyRelativeAlert(req.params.id, { sender: firebasePushSender }, { allowCannotTake: true }).catch(() => {});
   } catch (e) {
     next(e);
   }
@@ -149,6 +153,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     ok(res, {
       ...doseToJson(dose),
       medicationName: med?.name ?? null,
+      imageUrl: med?.image_url ?? null,
       dosageText: med?.dosage_text ?? null,
       instructions: med?.instructions ?? null,
       /** false khi người xem là người thân → giao diện chỉ xem, không hiện nút hành động */

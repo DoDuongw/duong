@@ -17,6 +17,8 @@ const envSchema = z.object({
   DOSE_GENERATION_DAYS: z.coerce.number().default(7),
   /** Số phút chưa xác nhận thì báo người thân (NOTIFICATION_PLAN §3.4). */
   RELATIVE_ALERT_AFTER_MINUTES: z.coerce.number().default(15),
+  /** So phut sau khi xac nhan uong thuoc thi gui push hoi tham suc khoe. */
+  WELLNESS_CHECK_AFTER_MINUTES: z.coerce.number().default(10),
   CORS_ORIGIN: z.string().default('*'),
 });
 

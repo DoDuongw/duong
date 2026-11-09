@@ -17,7 +17,8 @@ export interface UserProfile {
   id: string;
   phone: string | null;
   displayName: string | null;
-  address: string | null;
+  address?: string | null;
+  dateOfBirth?: string | null;
   timezone: string;
   preferences: UserPreferences | null;
   role?: UserRole;
@@ -71,6 +72,7 @@ export interface Dose {
 
 export interface DoseWithMedication extends Dose {
   medicationName: string | null;
+  imageUrl?: string | null;
   dosageText?: string | null;
   instructions?: string | null;
   canAct?: boolean;
@@ -95,6 +97,59 @@ export interface HistoryItem extends Dose {
 
 export interface HistoryPage {
   items: HistoryItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+/** Câu trả lời nhanh trong nhật ký sức khỏe. */
+export type HealthAnswer = 'good' | 'tired' | 'dizzy' | 'unwell' | 'other';
+
+/** Một mục nhật ký sức khỏe (push hỏi thăm sau khi uống thuốc). */
+export interface HealthLogItem {
+  id: string;
+  doseId: string | null;
+  medicationId: string | null;
+  medicationName: string | null;
+  kind: 'wellness_check' | 'note';
+  scheduledAt: string | null;
+  confirmedAt: string | null;
+  askedAt: string;
+  question: string;
+  answer: HealthAnswer | null;
+  answerNote: string | null;
+  answeredAt: string | null;
+}
+
+export interface HealthLogPage {
+  items: HealthLogItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+/** Loại push đã gửi cho người dùng. */
+export type NotificationKind =
+  | 'scheduled_reminder'
+  | 'overdue'
+  | 'snooze'
+  | 'relative_alert'
+  | 'wellness_check'
+  | 'sync';
+
+/** Một thông báo push người dùng đã nhận (tab "Thông báo"). */
+export interface NotificationHistoryItem {
+  id: string;
+  doseId: string | null;
+  kind: NotificationKind | string;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  sentAt: string;
+}
+
+export interface NotificationHistoryPage {
+  items: NotificationHistoryItem[];
   page: number;
   pageSize: number;
   total: number;

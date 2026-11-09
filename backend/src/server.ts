@@ -9,8 +9,8 @@ async function main() {
   await initDb();
   startJobs();
   const app = createApp();
-  app.listen(env.PORT, () => {
-    console.log(`Backend chạy tại http://localhost:${env.PORT}`);
+  app.listen(env.PORT, '0.0.0.0', () => {
+    console.log(`Backend chạy tại http://0.0.0.0:${env.PORT} (LAN: dùng IP máy + cổng ${env.PORT})`);
   });
 }
 

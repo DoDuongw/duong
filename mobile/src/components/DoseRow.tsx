@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text } from './Text';
 import { Card } from './Card';
 import { Button } from './Button';
 import { colors, spacing, radius, typography } from '../theme';

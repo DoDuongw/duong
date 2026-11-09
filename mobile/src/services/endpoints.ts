@@ -11,10 +11,14 @@ import type {
   FamilyInviteCreated,
   FamilyPermissions,
   HistoryPage,
+  HealthAnswer,
+  HealthLogItem,
+  HealthLogPage,
   Medication,
   MedicationInput,
   MedicationSchedule,
   MedicationStatus,
+  NotificationHistoryPage,
   TodayDoses,
   UserPreferences,
   UserProfile,
@@ -56,6 +60,7 @@ export function updateProfile(input: {
   phone?: string | null;
   address?: string | null;
   timezone?: string;
+  dateOfBirth?: string;
 }): Promise<UserProfile> {
   return apiFetch<UserProfile>("/users/me", { method: "PATCH", body: input });
 }
@@ -163,12 +168,37 @@ export interface HistoryQuery {
   from?: string;
   to?: string;
   medicationId?: string;
+  ownerId?: string;
   page?: number;
   pageSize?: number;
 }
 
 export function getHistory(params: HistoryQuery): Promise<HistoryPage> {
   return apiFetch<HistoryPage>(`/history${query({ ...params })}`);
+}
+
+export interface HealthLogQuery {
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export function getHealthLogs(params: HealthLogQuery = {}): Promise<HealthLogPage> {
+  return apiFetch<HealthLogPage>(`/health-logs${query({ ...params })}`);
+}
+
+export function answerHealthLog(
+  id: string,
+  input: { answer: HealthAnswer; note?: string | null },
+): Promise<HealthLogItem> {
+  return apiFetch<HealthLogItem>(`/health-logs/${id}`, { method: "PATCH", body: input });
+}
+
+export function getNotificationHistory(
+  params: { page?: number; pageSize?: number } = {},
+): Promise<NotificationHistoryPage> {
+  return apiFetch<NotificationHistoryPage>(`/notifications${query({ ...params })}`);
 }
 
 export function createFamilyInvite(): Promise<FamilyInviteCreated> {
@@ -209,10 +239,6 @@ export function getAdminUsers(params: { q?: string; page?: number; pageSize?: nu
 
 export function setAdminUserDisabled(id: string, disabled: boolean): Promise<{ id: string; disabled: boolean }> {
   return apiFetch(`/admin/users/${id}/status`, { method: "PATCH", body: { disabled } });
-}
-
-export function adminResetPassword(id: string, password: string): Promise<{ id: string; reset: true }> {
-  return apiFetch(`/admin/users/${id}/reset-password`, { method: "POST", body: { password } });
 }
 
 export function setAdminUserRole(id: string, role: UserRole): Promise<{ id: string; role: UserRole }> {

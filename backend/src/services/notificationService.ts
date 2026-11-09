@@ -4,19 +4,23 @@ import { User, UserDoc } from '../models/User';
 import { Device } from '../models/Device';
 import { FamilyConnection } from '../models/FamilyConnection';
 import { NotificationLog } from '../models/NotificationLog';
+import { NotificationHistory } from '../models/NotificationHistory';
+import { HealthLog } from '../models/HealthLog';
 import { getMessagingOrNull } from '../config/firebase';
 import { env } from '../config/env';
 import { addMinutes } from '../utils/time';
 import { MISSED_AFTER_MINUTES, OVERDUE_AFTER_MINUTES } from './doseService';
 
 /** Loại thông báo do server chủ động gửi (khớp `notification_logs.kind`). */
-export type PushKind = 'scheduled_reminder' | 'overdue' | 'snooze' | 'relative_alert';
+export type PushKind = 'scheduled_reminder' | 'overdue' | 'snooze' | 'relative_alert' | 'wellness_check';
 
 /** Nội dung push — gửi dạng data-only để Service Worker tự hiển thị (kiểm soát actions). */
 export interface PushPayload {
   title: string;
   body: string;
   tag: string;
+  /** Android notification channel; mặc định `med-reminders`. */
+  channelId?: string;
   data: Record<string, string>;
 }
 
@@ -72,21 +76,79 @@ function isInvalidTokenError(code: string | undefined): boolean {
   );
 }
 
-/**
- * Sender thật dùng Firebase Admin. Nếu Admin chưa cấu hình → coi như gửi hỏng
- * (ghi log `failed`) chứ không ném lỗi làm sập job cron.
- */
-export const firebasePushSender: PushSender = async (tokens, payload) => {
+function isExpoPushToken(token: string): boolean {
+  return /^Expo(nent)?PushToken\[.+\]$/.test(token);
+}
+
+function isExpoInvalidError(error: string | undefined): boolean {
+  return error === 'DeviceNotRegistered' || error === 'InvalidCredentials';
+}
+
+async function sendViaExpo(tokens: string[], payload: PushPayload): Promise<PushResult[]> {
+  try {
+    const fetchFn: typeof fetch | undefined = (globalThis as any).fetch;
+    if (!fetchFn) {
+      return tokens.map((token) => ({ token, ok: false, invalid: false, error: 'fetch_unavailable' }));
+    }
+    const messages = tokens.map((to) => ({
+      to,
+      title: payload.title,
+      body: payload.body,
+      data: payload.data,
+      sound: 'default',
+      priority: 'high',
+      channelId: payload.channelId || 'med-reminders',
+    }));
+    const res = await fetchFn('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Accept-encoding': 'gzip, deflate', 'Content-Type': 'application/json' },
+      body: JSON.stringify(messages),
+    });
+    const json: any = await res.json().catch(() => ({}));
+    const tickets: any[] = Array.isArray(json?.data) ? json.data : [];
+    return tokens.map((token, i) => {
+      const t = tickets[i] || {};
+      const ok = t.status === 'ok';
+      const err = t.details?.error || t.message;
+      return { token, ok, invalid: !ok && isExpoInvalidError(err), error: ok ? undefined : String(err || 'expo_push_failed') };
+    });
+  } catch (e) {
+    return tokens.map((token) => ({ token, ok: false, invalid: false, error: (e as Error).message }));
+  }
+}
+
+async function sendViaFcm(tokens: string[], payload: PushPayload): Promise<PushResult[]> {
   const messaging = getMessagingOrNull();
   if (!messaging) {
     return tokens.map((token) => ({ token, ok: false, invalid: false, error: 'FIREBASE_NOT_CONFIGURED' }));
   }
   const response = await messaging.sendEachForMulticast({
     tokens,
+    notification: { title: payload.title, body: payload.body },
     data: payload.data,
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: payload.channelId || 'med-reminders',
+        sound: 'default',
+        tag: payload.tag,
+      },
+    },
+    apns: {
+      headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+      payload: {
+        aps: {
+          alert: { title: payload.title, body: payload.body },
+          sound: 'default',
+          'thread-id': payload.tag,
+        },
+      },
+    },
     webpush: {
       headers: { Urgency: 'high', TTL: '600' },
+      notification: { title: payload.title, body: payload.body, tag: payload.tag },
       data: payload.data,
+      fcmOptions: payload.data.url ? { link: payload.data.url } : undefined,
     },
   });
   return response.responses.map((r, i) => ({
@@ -95,6 +157,27 @@ export const firebasePushSender: PushSender = async (tokens, payload) => {
     invalid: isInvalidTokenError(r.error?.code),
     error: r.error ? r.error.code ?? r.error.message : undefined,
   }));
+}
+
+/**
+ * Sender thật: hỗ trợ cả Expo Push Token (Expo Push Service, phù hợp Expo Go/dev)
+ * và token FCM/native (Firebase Admin). Nếu Firebase Admin chưa cấu hình, vẫn gửi được
+ * các token Expo Push; token FCM sẽ ghi lỗi `FIREBASE_NOT_CONFIGURED`.
+ */
+export const firebasePushSender: PushSender = async (tokens, payload) => {
+  const expoTokens = tokens.filter(isExpoPushToken);
+  const fcmTokens = tokens.filter((t) => !isExpoPushToken(t));
+  const results: PushResult[] = [];
+  if (expoTokens.length) results.push(...(await sendViaExpo(expoTokens, payload)));
+  if (fcmTokens.length) results.push(...(await sendViaFcm(fcmTokens, payload)));
+  // preserve input order
+  const byToken = new Map<string, PushResult[]>();
+  for (const r of results) {
+    const arr = byToken.get(r.token) || [];
+    arr.push(r);
+    byToken.set(r.token, arr);
+  }
+  return tokens.map((t) => (byToken.get(t) || [{ token: t, ok: false, invalid: false, error: 'missing_result' }]).shift()!);
 };
 
 interface DoseContext {
@@ -171,6 +254,26 @@ function snoozePayload(ctx: DoseContext): PushPayload {
       title: 'Nhắc lại: uống thuốc',
       body: `Đến giờ uống lại ${name}.`,
       tag: `dose-snooze-${dose.id}`,
+      url: `/dose/${dose.id}`,
+    },
+  };
+}
+
+function wellnessCheckPayload(ctx: DoseContext): PushPayload {
+  const dose = ctx.dose;
+  const name = ctx.medication?.name ?? 'thuốc';
+  const body = `Bạn cảm thấy thế nào sau khi uống ${name}? Hãy theo dõi sức khỏe và báo cho người thân nếu thấy bất thường.`;
+  return {
+    title: 'Hỏi thăm sức khỏe',
+    body,
+    tag: `dose-wellness-${dose.id}`,
+    channelId: 'med-wellness',
+    data: {
+      type: 'wellness_check',
+      doseId: dose.id,
+      title: 'Hỏi thăm sức khỏe',
+      body,
+      tag: `dose-wellness-${dose.id}`,
       url: `/dose/${dose.id}`,
     },
   };
@@ -278,6 +381,34 @@ async function sendPushToTokens(
     error,
   });
 
+  // Lịch sử thông báo cho người dùng: mỗi người nhận tối đa 1 bản ghi cho một lần gửi,
+  // kể cả khi họ có nhiều thiết bị cùng nhận thành công.
+  if (status === 'sent') {
+    const okTokens = results.filter((r) => r.ok).map((r) => r.token);
+    if (okTokens.length > 0) {
+      try {
+        const devices = await Device.find({ fcm_token: { $in: okTokens } }).select('user_id');
+        const userIds = Array.from(new Set(devices.map((d) => d.user_id.toString())));
+        if (userIds.length > 0) {
+          await NotificationHistory.insertMany(
+            userIds.map((user_id) => ({
+              user_id,
+              dose_id: doseId,
+              kind,
+              title: payload.title,
+              body: payload.body,
+              data: payload.data ?? null,
+              sent_at: now,
+            })),
+            { ordered: false },
+          );
+        }
+      } catch {
+        // Lịch sử chỉ để hiển thị; lỗi ghi lịch sử không được làm hỏng luồng gửi nhắc thuốc.
+      }
+    }
+  }
+
   if (status === 'sent' && options.markReminded) {
     await DoseOccurrence.updateOne({ _id: doseId }, { $set: { reminded_at: now } });
   }
@@ -370,17 +501,54 @@ export async function notifyDoseOverdue(doseId: string, deps: NotifyDeps): Promi
   return sendDosePush(ctx, 'overdue', overduePayload(ctx), deps, { maxAttempts, alreadySent });
 }
 
+function relativeCannotTakePayload(ctx: DoseContext): PushPayload {
+  const dose = ctx.dose;
+  const name = ctx.medication?.name ?? 'Thuốc';
+  const ownerName = ctx.owner?.display_name ?? 'Người thân';
+  const time = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: ctx.timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(dose.scheduled_at);
+  const reason = dose.cannot_take_reason ? ` Lý do: ${dose.cannot_take_reason}` : '';
+  const body = `${ownerName} báo không thể uống ${name} lúc ${time}.${reason}`;
+  return {
+    title: 'Người thân không thể uống thuốc',
+    body,
+    tag: `dose-relative-${dose.id}`,
+    data: {
+      type: 'relative_alert',
+      doseId: dose.id,
+      title: 'Người thân không thể uống thuốc',
+      body,
+      tag: `dose-relative-${dose.id}`,
+      url: `/dose/${dose.id}`,
+    },
+  };
+}
+
 /**
  * Thông báo người thân (NOTIFICATION_PLAN §3.4): khi lần uống **chưa được xác nhận**
  * (còn `pending`/`snoozed`/`overdue`, hoặc đã `missed`) quá ngưỡng
  * `RELATIVE_ALERT_AFTER_MINUTES`, gửi push tới thiết bị của mọi người thân có kết nối
  * `active` và `permissions.relative_alerts = true`.
  * Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống chỉ gửi một lần.
+ * `allowCannotTake`: khi người dùng chủ động báo "không thể uống", vẫn thông báo người thân
+ * (nội dung khác) nếu chưa từng gửi cảnh báo cho lần uống này.
  */
-export async function notifyRelativeAlert(doseId: string, deps: NotifyDeps): Promise<NotifyOutcome> {
+export async function notifyRelativeAlert(
+  doseId: string,
+  deps: NotifyDeps,
+  opts?: { allowCannotTake?: boolean },
+): Promise<NotifyOutcome> {
   const ctx = await loadDoseContext(doseId);
   if (!ctx) return { status: 'skipped', reason: 'not_found' };
-  if (!UNCONFIRMED_STATUSES.includes(ctx.dose.status)) {
+  const isCannotTake = ctx.dose.status === 'cannot_take';
+  if (isCannotTake && !opts?.allowCannotTake) {
+    return { status: 'skipped', reason: `status:${ctx.dose.status}` };
+  }
+  if (!isCannotTake && !UNCONFIRMED_STATUSES.includes(ctx.dose.status)) {
     return { status: 'skipped', reason: `status:${ctx.dose.status}` };
   }
   if (!ctx.medication || ctx.medication.status !== 'active') {
@@ -405,9 +573,69 @@ export async function notifyRelativeAlert(doseId: string, deps: NotifyDeps): Pro
   }
   if (tokens.length === 0) return { status: 'skipped', reason: 'no_relative_device' };
 
-  return sendPushToTokens(tokens, ctx.dose.id, 'relative_alert', relativeAlertPayload(ctx), deps, {
+  const payload = isCannotTake ? relativeCannotTakePayload(ctx) : relativeAlertPayload(ctx);
+  return sendPushToTokens(tokens, ctx.dose.id, 'relative_alert', payload, deps, {
     maxAttempts,
     alreadySent: false,
+    markReminded: false,
+  });
+}
+
+/** Cửa sổ "bắt kịp" cho push hỏi thăm sức khỏe (phút) — tránh gửi muộn sau khi server downtime dài. */
+export const WELLNESS_CATCHUP_MINUTES = 5;
+
+/**
+ * Push hỏi thăm sức khỏe: gửi tới chủ hồ sơ sau khi đã xác nhận uống thuốc
+ * `WELLNESS_CHECK_AFTER_MINUTES` phút. Mỗi lần uống chỉ gửi một lần
+ * (chống trùng theo `(dose_id, kind='wellness_check')`).
+ */
+export async function notifyDoseWellnessCheck(doseId: string, deps: NotifyDeps): Promise<NotifyOutcome> {
+  const ctx = await loadDoseContext(doseId);
+  if (!ctx) return { status: 'skipped', reason: 'not_found' };
+  const dose = ctx.dose;
+  if (dose.status !== 'confirmed') return { status: 'skipped', reason: `status:${dose.status}` };
+  if (!dose.confirmed_at) return { status: 'skipped', reason: 'not_confirmed_at' };
+  const now = deps.now ?? new Date();
+  const dueAt = addMinutes(dose.confirmed_at, env.WELLNESS_CHECK_AFTER_MINUTES);
+  if (dueAt.getTime() > now.getTime()) return { status: 'skipped', reason: 'not_due' };
+  if (!ctx.medication || ctx.medication.status !== 'active') {
+    return { status: 'skipped', reason: 'medication_inactive' };
+  }
+
+  const maxAttempts = deps.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const alreadySent =
+    (await terminalSent(doseId, 'wellness_check')) ||
+    (await attemptCount(doseId, 'wellness_check')) >= maxAttempts;
+  if (alreadySent) return { status: 'skipped', reason: 'already_sent' };
+
+  const tokens = await activeTokensForUser(dose.user_id);
+  const payload = wellnessCheckPayload(ctx);
+  // Lưu vào nhật ký sức khỏe trước khi gửi push: mục vẫn còn để xem/trả lời
+  // ngay cả khi thiết bị chưa đăng ký nhận thông báo.
+  await HealthLog.updateOne(
+    { dose_id: dose.id },
+    {
+      $setOnInsert: {
+        user_id: dose.user_id,
+        dose_id: dose.id,
+        medication_id: dose.medication_id,
+        medication_name: ctx.medication?.name ?? null,
+        kind: 'wellness_check',
+        scheduled_at: dose.scheduled_at,
+        confirmed_at: dose.confirmed_at,
+        asked_at: now,
+        question: payload.body,
+        answer: null,
+        answer_note: null,
+        answered_at: null,
+      },
+    },
+    { upsert: true },
+  );
+  return sendPushToTokens(tokens, dose.id, 'wellness_check', payload, deps, {
+    maxAttempts,
+    alreadySent: false,
+    // Không đụng `reminded_at` của liều uống.
     markReminded: false,
   });
 }
@@ -417,6 +645,7 @@ export interface ProcessResult {
   snoozes: number;
   overdue: number;
   relativeAlerts: number;
+  wellnessChecks: number;
   scanned: number;
 }
 
@@ -475,10 +704,22 @@ export async function processDueNotifications(deps: NotifyDeps): Promise<Process
     scheduled_at: { $lte: alertThreshold, $gt: alertWindowStart },
   }).limit(200);
 
+  // Đã xác nhận đủ lâu → push hỏi thăm sức khỏe (chống trùng theo dose+kind).
+  const wellnessThreshold = addMinutes(now, -env.WELLNESS_CHECK_AFTER_MINUTES);
+  const wellnessWindowStart = addMinutes(
+    now,
+    -(env.WELLNESS_CHECK_AFTER_MINUTES + WELLNESS_CATCHUP_MINUTES),
+  );
+  const wellnessDue = await DoseOccurrence.find({
+    status: 'confirmed',
+    confirmed_at: { $lte: wellnessThreshold, $gt: wellnessWindowStart },
+  }).limit(200);
+
   let reminders = 0;
   let snoozes = 0;
   let overdue = 0;
   let relativeAlerts = 0;
+  let wellnessChecks = 0;
 
   for (const dose of pendingDue) {
     const r = await notifyDoseReminder(dose.id, deps);
@@ -508,16 +749,23 @@ export async function processDueNotifications(deps: NotifyDeps): Promise<Process
     if (r.status === 'sent') relativeAlerts++;
   }
 
+  for (const dose of wellnessDue) {
+    const r = await notifyDoseWellnessCheck(dose.id, deps);
+    if (r.status === 'sent') wellnessChecks++;
+  }
+
   return {
     reminders,
     snoozes,
     overdue,
     relativeAlerts,
+    wellnessChecks,
     scanned:
       pendingDue.length +
       snoozedDue.length +
       overdueDue.length +
       missedDue.length +
-      alertCandidates.length,
+      alertCandidates.length +
+      wellnessDue.length,
   };
 }

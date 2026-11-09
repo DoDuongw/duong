@@ -42,12 +42,17 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
   }
   const token = header.slice(7);
   try {
-    const { uid } = await verifyIdToken(token);
+    const { uid, emailVerified } = await verifyIdToken(token);
     const user = await User.findOne({ firebase_uid: uid });
     // Tài khoản bị quản trị khóa: chặn ngay mọi API (kể cả đồng bộ hồ sơ)
     if (user?.disabled_at) {
       next(forbidden('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.'));
       return;
+    }
+    // Đồng bộ trạng thái xác minh email từ Firebase (không chặn request nếu lỗi)
+    if (user && emailVerified && !(user as any).email_verified_at) {
+      void User.updateOne({ _id: user._id }, { $set: { email_verified_at: new Date() } }).catch(() => {});
+      (user as any).email_verified_at = new Date();
     }
     req.user = {
       uid,

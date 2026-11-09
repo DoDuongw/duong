@@ -61,6 +61,18 @@ const syncSchema = z.object({
   address: addressField.optional(),
   timezone: z.string().min(1).max(50).optional(),
   preferences: z.record(z.unknown()).optional(),
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .refine((v) => {
+      if (!v) return true;
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return false;
+      if (d > new Date()) return false;
+      const age = (Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000);
+      return age >= 0 && age <= 120;
+    }, 'Ngày sinh không hợp lệ'),
 });
 
 // Lần đăng nhập đầu tiên chưa có bản ghi user → chỉ cần token hợp lệ, route tự tạo bản ghi
@@ -74,6 +86,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
     let user = await User.findOne({ firebase_uid: uid });
     if (!user) {
       try {
+        const dob = parsed.data.dateOfBirth ? new Date(parsed.data.dateOfBirth) : new Date('1970-01-01');
         user = await User.create({
           firebase_uid: uid,
           phone: parsed.data.phone ?? null,
@@ -81,7 +94,8 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
           address: parsed.data.address ?? null,
           timezone: parsed.data.timezone ?? env.TZ_DEFAULT,
           preferences: parsed.data.preferences ?? null,
-        });
+          date_of_birth: dob,
+        } as any);
       } catch (e) {
         // Hai request đồng thời (2 tab) cùng tạo → một request trúng unique index
         // `firebase_uid`; đọc lại bản ghi đã được request kia tạo thay vì trả 500.
@@ -97,6 +111,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
       if (parsed.data.address !== undefined) updates.address = parsed.data.address;
       if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
       if (parsed.data.preferences !== undefined) updates.preferences = parsed.data.preferences;
+      if (parsed.data.dateOfBirth !== undefined) updates.date_of_birth = new Date(parsed.data.dateOfBirth);
       if (Object.keys(updates).length > 0) {
         user = await User.findByIdAndUpdate(user._id, updates, { new: true });
       }
@@ -216,7 +231,7 @@ router.patch('/me/notification-settings', requireAuthMiddleware, async (req: Req
 
 const deviceSchema = z.object({
   fcmToken: z.string().min(1).max(512),
-  platform: z.enum(['web']),
+  platform: z.enum(['web', 'android', 'ios']),
   userAgent: z.string().max(255).optional(),
 });
 

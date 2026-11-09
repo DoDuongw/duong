@@ -8,13 +8,14 @@ import {
   createTestDose,
   createTestDevice,
 } from './helpers';
-import { DoseOccurrence, Device, NotificationLog, Medication, FamilyConnection, User } from '../src/models';
+import { DoseOccurrence, Device, NotificationLog, NotificationHistory, HealthLog, Medication, FamilyConnection, User } from '../src/models';
 import { Types } from 'mongoose';
 import { MISSED_AFTER_MINUTES } from '../src/services/doseService';
 import {
   notifyDoseReminder,
   notifyDoseSnooze,
   notifyDoseOverdue,
+  notifyDoseWellnessCheck,
   notifyRelativeAlert,
   processDueNotifications,
   DEFAULT_MAX_ATTEMPTS,
@@ -82,6 +83,11 @@ describe('notificationService - nhắc giờ uống', () => {
     const logs = await NotificationLog.find({ dose_id: dose.id, kind: 'scheduled_reminder' });
     expect(logs).toHaveLength(1);
     expect(logs[0].status).toBe('sent');
+
+    const history = await NotificationHistory.find({ user_id: user.id, dose_id: dose.id, kind: 'scheduled_reminder' });
+    expect(history).toHaveLength(1);
+    expect(history[0].title).toBe('Đến giờ uống thuốc');
+    expect(history[0].body).toContain('Thuốc');
 
     const updated = await DoseOccurrence.findById(dose.id);
     expect(updated!.reminded_at).not.toBeNull();
@@ -488,5 +494,135 @@ describe('notificationService - thông báo người thân khi chưa xác nhận
 
     expect(result.relativeAlerts).toBe(0);
     expect(spy.calls.some((c) => c.payload.data.type === 'relative_alert')).toBe(false);
+  });
+});
+
+describe('notificationService - hỏi thăm sức khỏe sau khi uống thuốc', () => {
+  async function setupConfirmedDose(confirmedMinutesAgo: number, now: Date) {
+    const user = await createTestUser();
+    const med = await createTestMedication(user.id);
+    const sch = await createTestSchedule(user.id, med.id);
+    const dose = await createTestDose(user.id, sch.id, med.id, new Date(now.getTime() - 60 * 60_000), 'confirmed');
+    await DoseOccurrence.updateOne(
+      { _id: dose.id },
+      { $set: { confirmed_at: new Date(now.getTime() - confirmedMinutesAgo * 60_000) } },
+    );
+    await createTestDevice(user.id, 'owner-token');
+    return { user, med, dose };
+  }
+
+  test('đủ 10 phút sau xác nhận → gửi push hỏi thăm sức khỏe, không đổi reminded_at', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z');
+    const { dose } = await setupConfirmedDose(10, now);
+    const spy = makeSender();
+
+    const outcome = await notifyDoseWellnessCheck(dose.id, makeDeps(spy, now));
+
+    expect(outcome.status).toBe('sent');
+    expect(spy.calls).toHaveLength(1);
+    expect(spy.calls[0].tokens).toEqual(['owner-token']);
+    expect(spy.calls[0].payload.data.type).toBe('wellness_check');
+    expect(spy.calls[0].payload.data.doseId).toBe(dose.id);
+    expect(spy.calls[0].payload.channelId).toBe('med-wellness');
+
+    const logs = await NotificationLog.find({ dose_id: dose.id, kind: 'wellness_check' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].status).toBe('sent');
+
+    const updated = await DoseOccurrence.findById(dose.id);
+    expect(updated!.reminded_at).toBeNull();
+
+    const healthLog = await HealthLog.findOne({ dose_id: dose.id });
+    expect(healthLog).not.toBeNull();
+    expect(healthLog!.kind).toBe('wellness_check');
+    expect(healthLog!.medication_name).toBe('Thuốc test');
+    expect(healthLog!.question).toContain('cảm thấy thế nào');
+    expect(healthLog!.answer).toBeNull();
+  });
+
+  test('không có thiết bị nhận push → vẫn lưu mục vào nhật ký sức khỏe', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z');
+    const user = await createTestUser();
+    const med = await createTestMedication(user.id);
+    const sch = await createTestSchedule(user.id, med.id);
+    const dose = await createTestDose(user.id, sch.id, med.id, new Date(now.getTime() - 60 * 60_000), 'confirmed');
+    await DoseOccurrence.updateOne(
+      { _id: dose.id },
+      { $set: { confirmed_at: new Date(now.getTime() - 10 * 60_000) } },
+    );
+    const spy = makeSender();
+
+    const outcome = await notifyDoseWellnessCheck(dose.id, makeDeps(spy, now));
+
+    expect(outcome.status).toBe('failed');
+    expect(outcome.reason).toBe('no_active_device');
+    expect(spy.calls).toHaveLength(0);
+    const healthLog = await HealthLog.findOne({ dose_id: dose.id });
+    expect(healthLog).not.toBeNull();
+  });
+
+  test('chưa đủ 10 phút → bỏ qua (not_due)', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z');
+    const { dose } = await setupConfirmedDose(5, now);
+    const spy = makeSender();
+
+    const outcome = await notifyDoseWellnessCheck(dose.id, makeDeps(spy, now));
+
+    expect(outcome.status).toBe('skipped');
+    expect(outcome.reason).toBe('not_due');
+    expect(spy.calls).toHaveLength(0);
+    expect(await NotificationLog.countDocuments({ dose_id: dose.id })).toBe(0);
+  });
+
+  test('chống trùng: mỗi lần uống chỉ gửi một push hỏi thăm', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z');
+    const { dose } = await setupConfirmedDose(12, now);
+    const spy = makeSender();
+
+    await notifyDoseWellnessCheck(dose.id, makeDeps(spy, now));
+    const second = await notifyDoseWellnessCheck(dose.id, makeDeps(spy, now));
+
+    expect(second.status).toBe('skipped');
+    expect(second.reason).toBe('already_sent');
+    expect(spy.calls).toHaveLength(1);
+  });
+
+  test('liều chưa xác nhận → bỏ qua', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z');
+    const user = await createTestUser();
+    const med = await createTestMedication(user.id);
+    const sch = await createTestSchedule(user.id, med.id);
+    const dose = await createTestDose(user.id, sch.id, med.id, new Date(now.getTime() - 60 * 60_000), 'pending');
+    await createTestDevice(user.id, 'owner-token');
+    const spy = makeSender();
+
+    const outcome = await notifyDoseWellnessCheck(dose.id, makeDeps(spy, now));
+
+    expect(outcome.status).toBe('skipped');
+    expect(outcome.reason).toBe('status:pending');
+    expect(spy.calls).toHaveLength(0);
+  });
+
+  test('cron: quét liều đã xác nhận đủ 10 phút và gửi hỏi thăm', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z');
+    await setupConfirmedDose(11, now);
+    const spy = makeSender();
+
+    const result = await processDueNotifications({ sender: spy.sender, now, sleep: async () => {} });
+
+    expect(result.wellnessChecks).toBe(1);
+    expect(spy.calls.some((c) => c.payload.data.type === 'wellness_check')).toBe(true);
+    expect(await NotificationLog.countDocuments({ kind: 'wellness_check', status: 'sent' })).toBe(1);
+  });
+
+  test('cron: liều xác nhận quá lâu (ngoài cửa sổ bắt kịp) → không gửi muộn', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z');
+    await setupConfirmedDose(30, now);
+    const spy = makeSender();
+
+    const result = await processDueNotifications({ sender: spy.sender, now, sleep: async () => {} });
+
+    expect(result.wellnessChecks).toBe(0);
+    expect(spy.calls.some((c) => c.payload.data.type === 'wellness_check')).toBe(false);
   });
 });

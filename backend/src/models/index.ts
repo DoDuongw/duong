@@ -8,6 +8,8 @@ export { DoseOccurrence, DoseStatus } from './DoseOccurrence';
 export { FamilyInvite } from './FamilyInvite';
 export { FamilyConnection } from './FamilyConnection';
 export { NotificationLog } from './NotificationLog';
+export { NotificationHistory } from './NotificationHistory';
+export { HealthLog } from './HealthLog';
 export { AuditLog } from './AuditLog';
 
 import { connectDb } from '../config/db';

@@ -1,48 +1,54 @@
-import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
+import { useCallback, useState } from "react";
+import { View, StyleSheet, ScrollView, Alert, RefreshControl, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Card, Button, Section, Notice } from "../../components";
+import { router, useFocusEffect } from "expo-router";
+import { Card, Button, Section, Notice, Text } from "../../components";
 import { colors, spacing, typography, radius } from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
 import { confirmDose, getTodayDoses, newClientRequestId } from "../../services/endpoints";
 import type { DoseWithMedication, TodayDoses } from "../../types";
-import { BUOI_LABEL, formatTime } from "../../utils/dateTime";
+import { buoiOfIso, formatTime, todayYmd } from "../../utils/dateTime";
 import { nextActionable } from "../../utils/doseStatus";
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, profile, timezone } = useAuth();
   const [data, setData] = useState<TodayDoses | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [acting, setActing] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await getTodayDoses();
       setData(res);
     } catch (e) {
       setData(null);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }
-
-  useEffect(() => {
-    load();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   const doses: DoseWithMedication[] = data?.doses || [];
   const next = nextActionable(doses);
-  const taken = doses.filter((d) => d.status === 'taken').length;
-  const total = doses.length;
-  const remaining = total - taken;
+  const stats = data?.stats || { confirmed: 0, remaining: 0, total: 0 };
+  const taken = stats.confirmed;
+  const total = stats.total;
+  const remaining = stats.remaining;
   const pct = total === 0 ? 0 : Math.round((taken / total) * 100);
 
-  async function handleConfirm() {
-    if (!next) return;
+  async function handleConfirm(dose?: DoseWithMedication | null) {
+    const target = dose ?? next;
+    if (!target) return;
     try {
       setActing(true);
-      await confirmDose(next.id, newClientRequestId());
+      await confirmDose(target.id, newClientRequestId());
       await load();
       Alert.alert('Thành công', 'Đã ghi nhận đã uống thuốc');
     } catch (e: any) {
@@ -52,34 +58,38 @@ export default function HomeScreen() {
     }
   }
 
-  const groups: Record<string, DoseWithMedication[]> = {
-    sang: [],
-    trua: [],
-    chieu: [],
-    toi: [],
-  };
+
+
+  const groups: Record<string, DoseWithMedication[]> = { sang: [], trua: [], chieu: [], toi: [] };
   for (const d of doses) {
-    const h = d.scheduledTime ? new Date(d.scheduledTime).getHours() : 8;
-    if (h >= 5 && h < 11) groups.sang.push(d);
-    else if (h >= 11 && h < 14) groups.trua.push(d);
-    else if (h >= 14 && h < 18) groups.chieu.push(d);
-    else groups.toi.push(d);
+    groups[buoiOfIso(d.scheduledAt, timezone)].push(d);
   }
+
+  const displayName = (profile as any)?.displayName || (user as any)?.displayName;
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
+      >
         <View style={styles.greeting}>
-          <Text style={styles.hello}>Xin chào{(user as any)?.displayName ? `, ${(user as any).displayName}` : ''} 👋</Text>
-          <Text style={styles.date}>Hôm nay • {new Date().toLocaleDateString('vi-VN')}</Text>
-          <View style={styles.progressWrap}>
+          <View style={styles.greetingTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.hello}>Xin chào{displayName ? `, ${displayName}` : ''} 👋</Text>
+              <Text style={styles.date}>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}</Text>
+            </View>
+          </View>
+          <View style={styles.progressCard}>
             <View style={styles.progressHead}>
-              <Text style={styles.progressText}>Tiến độ hôm nay</Text>
-              <Text style={styles.progressText}>{taken}/{total} liều</Text>
+              <Text style={styles.progressLabel}>Tiến độ hôm nay</Text>
+              <Text style={styles.progressValue}>{taken}/{total} liều</Text>
             </View>
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+              <View style={[styles.progressBarFill, { width: `${Math.min(pct, 100)}%` }]} />
             </View>
+            <Text style={styles.progressHint}>{total === 0 ? 'Chưa có lịch uống thuốc hôm nay' : `Hoàn thành ${pct}%`}</Text>
           </View>
         </View>
 
@@ -89,14 +99,24 @@ export default function HomeScreen() {
               <Text style={styles.nowLabelText}>🔔 Cần uống bây giờ</Text>
             </View>
             <View style={styles.nowHead}>
-              <Text style={styles.nowTime}>{formatTime(next.scheduledTime)}</Text>
+              <Text style={styles.nowTime}>{formatTime(next.scheduledAt, timezone)}</Text>
+              {next.imageUrl ? <Image source={{ uri: next.imageUrl }} style={styles.nowThumb} /> : null}
               <View style={styles.nowInfo}>
-                <Text style={styles.nowName}>{next.medication?.name || 'Thuốc'}</Text>
-                <Text style={styles.nowMeta}>Liều: {next.doseAmount ? `${next.doseAmount} ${next.doseUnit || ''}`.trim() : (next.medication?.dosageText || '1 viên')}</Text>
-                {next.medication?.instructions ? <Text style={styles.nowMeta}>{next.medication.instructions}</Text> : null}
+                <Text style={styles.nowName}>{next.medicationName || 'Thuốc'}</Text>
+                <Text style={styles.nowMeta}>{next.dosageText || '1 viên'}</Text>
+                {next.instructions ? <Text style={styles.nowMeta}>{next.instructions}</Text> : null}
               </View>
             </View>
-            <Button loading={acting} onPress={handleConfirm}>Đã uống thuốc</Button>
+            <Button loading={acting} disabled={acting} onPress={() => handleConfirm()}>
+              Đã uống thuốc
+            </Button>
+            <Button
+              variant="ghost"
+              style={{ marginTop: 8 }}
+              onPress={() => router.push(`/dose/${next.id}` as any)}
+            >
+              Nhắc lại sau / Không thể uống
+            </Button>
           </View>
         ) : (
           <Notice tone="info" icon="✅">
@@ -139,10 +159,13 @@ export default function HomeScreen() {
                 <Text style={styles.dayPartEmpty}>Không có lần uống nào</Text>
               ) : (
                 groups[buoi.key].map((d) => (
-                  <View key={d.id} style={styles.doseItem}>
-                    <Text style={styles.doseTime}>{formatTime(d.scheduledTime)}</Text>
-                    <Text style={styles.doseName}>{d.medication?.name} • {d.status === 'taken' ? 'Đã uống' : d.status === 'pending' ? 'Chưa uống' : d.status}</Text>
-                  </View>
+                  <TouchableOpacity key={d.id} style={styles.doseItem} onPress={() => router.push(`/dose/${d.id}` as any)} activeOpacity={0.75}>
+                    <Text style={styles.doseTime}>{formatTime(d.scheduledAt, timezone)}</Text>
+                    {d.imageUrl ? <Image source={{ uri: d.imageUrl }} style={styles.doseThumb} /> : null}
+                    <Text style={styles.doseName}>
+                      {d.medicationName || 'Thuốc'} • {d.status === 'confirmed' ? 'Đã uống' : d.status === 'pending' || d.status === 'snoozed' || d.status === 'overdue' ? 'Chưa uống' : d.status === 'missed' ? 'Bỏ lỡ' : d.status === 'cannot_take' ? 'Không thể uống' : d.status}
+                    </Text>
+                  </TouchableOpacity>
                 ))
               )}
             </View>
@@ -150,8 +173,8 @@ export default function HomeScreen() {
         </Section>
 
         <View style={styles.shortcuts}>
-          <Button variant="secondary" style={styles.shortcutBtn}>📅 Xem lịch uống thuốc</Button>
-          <Button variant="secondary" style={styles.shortcutBtn}>👨‍👩‍👧 Người thân</Button>
+          <Button variant="secondary" style={styles.shortcutBtn} onPress={() => router.push('/(tabs)/schedule')}>📅 Xem lịch</Button>
+          <Button variant="secondary" style={styles.shortcutBtn} onPress={() => router.push('/family' as any)}>👨‍👩‍👧 Người thân</Button>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -168,32 +191,42 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl,
   },
   greeting: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
     marginBottom: spacing.lg,
   },
+  greetingTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
   hello: {
-    ...typography.h1,
-    color: '#fff',
-    marginBottom: 4,
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 2,
   },
   date: {
     ...typography.body,
-    color: '#c8dcec',
+    color: colors.muted,
   },
-  progressWrap: {
-    marginTop: spacing.lg,
+  progressCard: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
   },
   progressHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  progressText: {
-    ...typography.bodySm,
-    color: '#fff',
+  progressLabel: {
+    ...typography.body,
+    color: '#e8f3fb',
     fontWeight: '600',
+  },
+  progressValue: {
+    ...typography.h2,
+    color: '#fff',
   },
   progressBarBg: {
     height: 12,
@@ -204,9 +237,15 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     backgroundColor: '#7fd8a0',
+    borderRadius: 999,
+  },
+  progressHint: {
+    ...typography.bodySm,
+    color: '#d4e7f5',
+    marginTop: spacing.sm,
   },
   nowCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#fffcf2',
     borderWidth: 2,
     borderColor: '#f0c98a',
     borderRadius: radius.lg,
@@ -217,27 +256,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   nowLabelText: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.warning,
-    letterSpacing: 0.5,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#8a5b00',
+    letterSpacing: 0.3,
   },
   nowHead: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
-    flexWrap: 'wrap',
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#e4c89a',
-    borderStyle: 'dashed',
+    borderBottomColor: '#e9d7a8',
     marginBottom: spacing.md,
   },
   nowTime: {
-    fontSize: 44,
+    fontSize: 42,
     fontWeight: '800',
     color: colors.primaryDark,
   },
+  nowThumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: '#fef3c7' },
   nowInfo: {
     flex: 1,
   },
@@ -249,9 +287,6 @@ const styles = StyleSheet.create({
     ...typography.bodySm,
     color: colors.muted,
     marginTop: 2,
-  },
-  ghostBtn: {
-    marginTop: spacing.sm,
   },
   statGrid: {
     flexDirection: 'row',
@@ -268,16 +303,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 30,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
   },
   statLabel: {
     ...typography.caption,
     color: colors.muted,
+    marginTop: 2,
   },
   statSummary: {
     ...typography.body,
     fontWeight: '600',
+    color: colors.text,
   },
   dayPart: {
     marginBottom: spacing.md,
@@ -302,10 +339,12 @@ const styles = StyleSheet.create({
   dayPartCount: {
     ...typography.caption,
     color: colors.muted,
+    fontWeight: '600',
   },
   dayPartEmpty: {
     ...typography.bodySm,
     color: colors.muted,
+    fontStyle: 'italic',
   },
   shortcuts: {
     flexDirection: 'row',
@@ -315,19 +354,57 @@ const styles = StyleSheet.create({
   shortcutBtn: {
     flex: 1,
   },
+  nowActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  nowActionBtn: { flex: 1 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalTitle: { ...typography.h2, color: colors.text, marginBottom: 4 },
+  modalSub: { ...typography.bodySm, color: colors.muted, marginBottom: spacing.md },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 48,
+    color: colors.text,
+    backgroundColor: colors.surface2,
+    marginBottom: spacing.md,
+  },
+  modalActions: { flexDirection: 'row', gap: spacing.sm },
+  modalBtn: { flex: 1 },
   doseItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surface2,
+    borderRadius: radius.sm,
+    marginBottom: spacing.xs,
   },
   doseTime: {
     ...typography.body,
     fontWeight: '700',
-    minWidth: 60,
+    minWidth: 56,
+    color: colors.primaryDark,
   },
+  doseThumb: { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.surface },
   doseName: {
     ...typography.bodySm,
     color: colors.text,

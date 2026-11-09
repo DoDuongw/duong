@@ -30,8 +30,26 @@
           "icon": "./assets/icon.png",
           "color": "#12659c"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ứng dụng cần quyền truy cập ảnh để bạn chọn ảnh thuốc.",
+          "cameraPermission": "Ứng dụng cần quyền camera để bạn chụp ảnh thuốc."
+        }
       ]
     ],
-    "scheme": "medreminder"
+    "scheme": "medreminder",
+    "extra": {
+      "API_BASE_URL": "http://192.168.100.23:3000/api/v1",
+      "FIREBASE_API_KEY": "AIzaSyBlqzArvYUnI4IqRmL-1dtKjRaxYU6DARc",
+      "FIREBASE_AUTH_DOMAIN": "medicationreminder-6177c.firebaseapp.com",
+      "FIREBASE_PROJECT_ID": "medicationreminder-6177c",
+      "FIREBASE_STORAGE_BUCKET": "medicationreminder-6177c.firebasestorage.app",
+      "FIREBASE_MESSAGING_SENDER_ID": "17863850068",
+      "FIREBASE_APP_ID": "1:17863850068:web:01e9d0e5c32099da5195c1",
+      "FIREBASE_MEASUREMENT_ID": "G-TMXSQTCNK3",
+      "FIREBASE_VAPID_KEY": ""
+    }
   }
 }

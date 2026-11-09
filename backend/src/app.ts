@@ -6,6 +6,8 @@ import { usersRouter } from './routes/usersRoot';
 import { medicationsRouter } from './routes/medications';
 import { dosesRouter } from './routes/doses';
 import { historyRouter } from './routes/history';
+import { healthLogsRouter } from './routes/healthLogs';
+import { notificationsRouter } from './routes/notifications';
 import { familyRouter } from './routes/family';
 import { adminRouter } from './routes/adminRoot';
 import { env } from './config/env';
@@ -25,6 +27,8 @@ export function createApp() {
   app.use('/api/v1/medications', medicationsRouter);
   app.use('/api/v1/doses', dosesRouter);
   app.use('/api/v1/history', historyRouter);
+  app.use('/api/v1/health-logs', healthLogsRouter);
+  app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/family', familyRouter);
   app.use('/api/v1/admin', adminRouter);
 
