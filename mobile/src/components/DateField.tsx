@@ -4,13 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, typography } from "../theme";
 import { Text } from "./Text";
 import { Button } from "./Button";
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
+import { clamp, pad2 } from "../utils/number";
 
 export function isValidYmd(ymd: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((ymd || "").trim());
