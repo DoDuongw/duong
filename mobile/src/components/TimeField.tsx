@@ -4,17 +4,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, typography } from "../theme";
 import { Text } from "./Text";
 import { Button } from "./Button";
+import { clamp, pad2 } from "../utils/number";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
 
 export function normalizeTimeInput(value: string): string {
   const v = (value || "").trim();
