@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Card, Button, StateView, Text } from "../../components";
+import { Card, Button, Notice, StateView, Text } from "../../components";
 import { colors, spacing, typography, radius } from "../../theme";
 import { getNotificationHistory } from "../../services/endpoints";
 import type { NotificationHistoryItem } from "../../types";
@@ -20,6 +20,15 @@ const KIND_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: s
   wellness_check: { icon: "heart-outline", label: "Hỏi thăm sức khỏe", tone: colors.success },
   sync: { icon: "sync-outline", label: "Đồng bộ", tone: colors.muted },
 };
+
+function errorLabel(error: string | null): string {
+  if (!error) return "Chưa gửi được";
+  if (error === "no_active_device") return "Chưa có thiết bị nhận thông báo";
+  if (error === "token_invalid") return "Thiết bị không còn hợp lệ";
+  if (error === "FIREBASE_NOT_CONFIGURED") return "Máy chủ chưa cấu hình Firebase";
+  if (error === "DeviceNotRegistered") return "Thiết bị chưa đăng ký nhận push";
+  return error;
+}
 
 export default function NotificationsScreen() {
   const { timezone } = useAuth();
@@ -52,6 +61,7 @@ export default function NotificationsScreen() {
   );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const failedCount = items.filter((item) => item.status !== "sent").length;
 
   function onRefresh() {
     setRefreshing(true);
@@ -75,7 +85,7 @@ export default function NotificationsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <Text style={styles.pageTitle}>Thông báo</Text>
-        <Text style={styles.pageSub}>Toàn bộ thông báo push bạn đã nhận trên thiết bị của mình.</Text>
+        <Text style={styles.pageSub}>Toàn bộ thông báo push đã được tạo cho bạn, kể cả lần gửi chưa thành công.</Text>
 
         {loading ? (
           <StateView state="loading" />
@@ -90,6 +100,21 @@ export default function NotificationsScreen() {
           </Card>
         ) : (
           <>
+            {failedCount > 0 ? (
+              <>
+                <Notice tone="warning" icon="⚠️">
+                  Trong trang này có {failedCount} thông báo chưa gửi được. Vào Hồ sơ → Cài đặt → “Bật / kiểm tra thông báo đẩy” để nhận push.
+                </Notice>
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onPress={() => router.push("/settings" as any)}
+                  style={styles.settingsBtn}
+                >
+                  Mở cài đặt thông báo
+                </Button>
+              </>
+            ) : null}
             <Card style={styles.summaryCard}>
               <Text style={styles.summaryText}>
                 🔔 {total} thông báo — trang {page}/{totalPages}
@@ -122,6 +147,9 @@ export default function NotificationsScreen() {
                       </View>
                       <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
                       <Text style={styles.itemText} numberOfLines={4}>{item.body}</Text>
+                      {item.status !== "sent" ? (
+                        <Text style={styles.itemError}>⚠️ {errorLabel(item.error)}</Text>
+                      ) : null}
                       {canOpen ? (
                         <Text style={styles.itemAction}>
                           {item.kind === "wellness_check" ? "Trả lời câu hỏi →" : "Xem chi tiết →"}
@@ -165,6 +193,7 @@ const styles = StyleSheet.create({
   pageSub: { ...typography.body, color: colors.muted, marginBottom: spacing.lg },
   summaryCard: { marginBottom: spacing.md },
   summaryText: { ...typography.body, fontWeight: "700", color: colors.text },
+  settingsBtn: { marginBottom: spacing.md },
   empty: { ...typography.body, color: colors.muted, textAlign: "center", fontWeight: "700" },
   emptyHint: { ...typography.bodySm, color: colors.muted, textAlign: "center", marginTop: 4 },
   list: { gap: spacing.sm },
@@ -192,6 +221,7 @@ const styles = StyleSheet.create({
   itemTime: { ...typography.caption, color: colors.muted },
   itemTitle: { ...typography.body, fontWeight: "800", color: colors.text, marginTop: 2 },
   itemText: { ...typography.bodySm, color: colors.muted, marginTop: 2 },
+  itemError: { ...typography.caption, color: colors.warning, fontWeight: "700", marginTop: 6 },
   itemAction: { ...typography.caption, color: colors.primary, fontWeight: "700", marginTop: 6 },
   pagination: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
   pageBtn: { flex: 1 },

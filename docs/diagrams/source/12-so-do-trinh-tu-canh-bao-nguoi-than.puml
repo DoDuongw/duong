@@ -1,0 +1,52 @@
+@startuml
+title Cảnh báo người thân khi lần uống chưa được xác nhận
+autonumber
+participant "node-cron\n(mỗi phút)" as Cron
+participant "doses route" as Route
+participant "notificationService" as Service
+database "MongoDB" as DB
+participant "Expo Push / FCM" as Push
+participant "Thiết bị người thân" as Device
+actor "Người thân" as Relative
+
+alt bấm "Không thể uống"
+  Route -> Service : notifyRelativeAlert(doseId)\n(best-effort, không chặn response)
+else cron quét định kỳ
+  Cron -> Service : processDueNotifications()
+  Service -> DB : tìm dose chưa confirmed quá ngưỡng\npending / snoozed / overdue / cannot_take
+  Service -> DB : tìm missed mới chuyển\n(lưới an toàn)
+  DB --> Service : danh sách dose
+end
+
+Service -> DB : đọc dose + thuốc + chủ hồ sơ
+alt dose đã confirmed hoặc thuốc đã ngừng
+  Service --> Service : bỏ qua
+else cần cảnh báo
+  Service -> DB : tìm FamilyConnection active\ncó permissions.relative_alerts=true
+  DB --> Service : danh sách relative_id
+  alt không có người thân
+    Service --> Service : bỏ qua
+  else có người thân
+    Service -> DB : đọc NotificationHistory\n(dose + kind + user) đã gửi
+    Service -> Service : chỉ giữ người chưa nhận
+    Service -> DB : đếm lần gửi lỗi thực tế\n(không tính no_active_device)
+    alt đã gửi đủ hoặc vượt 3 lần lỗi
+      Service --> Service : bỏ qua
+    else còn người cần gửi
+      Service -> DB : lấy Device active của người thân
+      Service -> Service : tạo payload\n"chưa uống" hoặc "không thể uống" + lý do
+      Service -> Push : gửi push tới từng token
+      Push --> Device : notification
+      Device --> Relative : hiển thị cảnh báo
+      Service -> DB : ghi NotificationLog\n+ NotificationHistory theo người nhận
+    end
+  end
+end
+
+note over Cron,Service
+  Ngưỡng mặc định RELATIVE_ALERT_AFTER_MINUTES=10.
+  Mốc tính là scheduled_at, hoặc snoozed_until nếu đã nhắc lại.
+  Chỉ confirmed là không báo; cannot_take báo ngay khi bấm.
+  Mỗi dose + kind + người nhận chỉ gửi thành công một lần.
+end note
+@enduml

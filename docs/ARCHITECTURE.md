@@ -1,36 +1,56 @@
 # ARCHITECTURE — Kiến trúc hệ thống
 
+> Tài liệu này phản ánh mã nguồn hiện tại trong `mobile/` và `backend/`.
+> Ứng dụng chính là Expo/React Native; Expo Web chỉ là một target phụ dùng chung mã nguồn `mobile/`.
+
 ## 1. Sơ đồ tổng thể
 
 ```mermaid
 graph TB
-    subgraph Web [Website React + Vite - PWA]
-        UI[8 màn hình M01–M08 - responsive mobile-first]
-        AUTH[Firebase Auth - Email + Mật khẩu]
-        SW[Service Worker - nhận/hiển thị Web Push]
-        FCMR[FCM Web SDK - đăng ký token web]
-        UI --> API
-        SW --> UI
-        FCMR --> UI
-        AUTH --> UI
+    subgraph Mobile ["mobile/ — Expo Router (Android / iOS / Expo Web)"]
+        UI["Màn hình: tabs + stack"]
+        STATE["AuthProvider + hooks"]
+        APICLIENT["API client (axios)<br/>Bearer Firebase ID token"]
+        NATIVE["expo-notifications"]
+        WEB["Firebase JS SDK"]
+        SW["public/sw.js<br/>Service Worker"]
+
+        UI --> STATE
+        UI --> APICLIENT
+        STATE --> APICLIENT
+        STATE --> NATIVE
+        STATE --> WEB
+        WEB --> SW
     end
 
-    subgraph Server [Backend Node.js/Express TypeScript]
-        MW[xác minh ID token - phân quyền - validation]
-        CTL[Controllers]
-        SVC[Services - thuốc, lịch, lần uống, kết nối, thông báo]
-        JOBS[node-cron - sinh lần uống, gửi Web Push, quá giờ]
-        MW --> CTL --> SVC
+    subgraph Backend ["backend/ — Node.js + Express + TypeScript"]
+        API["REST API<br/>/api/v1"]
+        MW["authMiddleware + familyAccess"]
+        ROUTES["Routes"]
+        SVC["Services: thuốc, lần uống,<br/>thông báo, quản trị"]
+        JOBS["node-cron"]
+        ADMIN["Firebase Admin SDK"]
+        UPLOADS["Ảnh thuốc cục bộ<br/>/uploads"]
+
+        API --> MW
+        MW --> ROUTES
+        ROUTES --> SVC
         JOBS --> SVC
+        SVC --> ADMIN
+        ROUTES --> UPLOADS
     end
 
-    DB[(MongoDB - Mongoose)]
-    FCM[Firebase Cloud Messaging - Web Push]
+    DB[("MongoDB<br/>Mongoose + ObjectId")]
+    FIREBASE["Firebase Authentication"]
+    PUSH["FCM / Expo Push"]
 
+    APICLIENT --> API
+    STATE --> FIREBASE
+    ADMIN --> FIREBASE
     SVC --> DB
-    SVC --> FCM
-    FCM --> SW
-    API[API HTTPS JSON] --> MW
+    ADMIN --> PUSH
+    PUSH --> NATIVE
+    PUSH --> SW
 ```
 
 ## 2. Luồng chính
@@ -38,73 +58,83 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant U as Người dùng
-    participant App as Web (trang)
-    participant API as Backend
+    participant App as Expo app<br/>(mobile/ hoặc Expo Web)
+    participant FA as Firebase Auth
+    participant API as Backend /api/v1
     participant DB as MongoDB
-    participant F as FCM Web Push
-    participant L as Service Worker
+    participant J as node-cron
+    participant P as FCM / Expo Push
 
-    U->>App: Nhập email + mật khẩu
-    App->>F: Firebase Auth xác thực
-    F-->>App: ID token
-    App->>API: API call kèm Authorization Bearer
-    API->>API: Xác minh ID token (Firebase Admin)
-    API->>DB: Đọc/ghi dữ liệu (kiểm tra chủ sở hữu)
-    API-->>App: JSON phản hồi
-    App->>F: Đăng ký token web (FCM Web SDK + quyền Notifications)
+    U->>App: mở ứng dụng
+    App->>FA: đăng nhập / lấy ID token
+    FA-->>App: ID token
+    App->>API: GET /users/me (Bearer token)
+    alt chưa có hồ sơ
+        App->>API: POST /users/me/sync
+        API->>DB: tạo user theo firebase_uid
+    else đã có hồ sơ
+        API->>DB: đọc user + role
+    end
+    API-->>App: JSON hồ sơ
+    App->>P: đăng ký token thiết bị
 
-    Note over API,F,L: Giờ uống tới — server node-cron gửi Web Push (kênh chính)
-    Note over L,App: Trang đang mở → hiện trong trang; bấm push → mở M02
-    Note over API,F,L: Nhắc từ server khi quá giờ / thông báo người thân — FCM
+    J->>DB: quét lần uống đến hạn / quá hạn
+    J->>P: gửi push nhắc thuốc, quá giờ,<br/>cảnh báo người thân, hỏi thăm sức khỏe
+    P-->>App: notification / service worker
+    U->>App: bấm push
+    App->>App: mở /dose/:id hoặc /health-journal
 ```
 
 ## 3. Trách nhiệm từng lớp
 
 | Thành phần | Trách nhiệm |
 |---|---|
-| Web (`web/`) | Giao diện M01–M08 responsive + khu vực vận hành `/admin` (ngoài M01–M08), đăng nhập Firebase, đăng ký token Web Push, hiển thị thông báo trong trang, gọi API, PWA manifest |
-| Service Worker | Nhận Web Push từ FCM khi trang đóng/mở, hiển thị notification, bấm → mở M02; hủy notification đã hiển thị khi xác nhận |
-| Backend | Xác minh ID token, phân quyền (chủ hồ sơ/người thân/admin), kiểm tra dữ liệu đầu vào, nghiệp vụ, cung cấp API, nhật ký thay đổi |
-| Vận hành (`/api/v1/admin`) | `role='manager'` hoặc `'admin'`: số liệu chỉ đọc, danh sách người dùng không nội dung y tế, khóa/mở (đồng bộ Firebase + DB), xem lỗi gửi thông báo/nhật ký. Chỉ `admin`: đặt lại mật khẩu qua Firebase Admin và đổi vai trò |
-| node-cron (src/jobs) | Chạy mỗi phút: sinh lần uống từ lịch, **gửi Web Push đúng giờ uống**, phát hiện quá giờ/bỏ qua |
-| FCM (Web Push) | Kênh nhắc từ server: giờ uống, quá giờ, đồng bộ lịch, thông báo tới người thân |
-| MongoDB | Lưu toàn bộ dữ liệu nghiệp vụ |
-| Firebase Auth | Quản lý danh tính Email + Mật khẩu (Spark plan); không thay thế backend |
+| `mobile/` | Ứng dụng Expo Router: đăng nhập Firebase, tabs Trang chủ / Lịch / Thuốc / Thông báo / Vận hành / Hồ sơ, các màn hình stack như `dose/[id]`, `medication/[id]`, `family`, `health-journal`, `settings`, `admin`. Gọi API bằng Bearer ID token. |
+| Push native | `expo-notifications` trên Android/iOS: đăng ký token, tạo Android channel, hiển thị nút thao tác nhanh, mở deep link khi bấm. |
+| Expo Web | Dùng chung mã nguồn Expo Router. `expo-notifications` không hỗ trợ web nên dùng Firebase JS SDK + `mobile/public/sw.js` để nhận FCM Web Push. |
+| Backend | Xác minh Firebase ID token, kiểm tra tài khoản bị khóa, phân quyền chủ hồ sơ/người thân/manager/admin, validate dữ liệu, xử lý nghiệp vụ và trả JSON thống nhất. |
+| `authMiddleware` + `familyAccess` | Gắn `userId`/`role`/`timezone`; `resolveOwnerAccess` kiểm tra `?ownerId=` và quyền `view_schedule` / `manage_medication`. |
+| Services | `doseService`: sinh lần uống, chuyển trạng thái, confirm/snooze/cannot-take. `notificationService`: chọn payload, gửi push, chống trùng, ghi lịch sử. `adminService`: dashboard, khóa/mở, đổi vai trò, xóa tài khoản. |
+| `node-cron` | Mỗi phút chuyển `pending → overdue` sau 30 phút và `→ missed` sau 120 phút; gửi push đến hạn, quá giờ, cảnh báo người thân và hỏi thăm sức khỏe. Mỗi ngày 00:00 sinh lần uống cho 7 ngày tới. |
+| `Firebase Admin SDK` | Xác minh ID token, khóa/mở tài khoản Firebase, thu hồi refresh token, xóa user; gửi FCM. |
+| `Firebase Authentication` | Quản lý danh tính email/mật khẩu; backend không lưu mật khẩu. |
+| MongoDB + Mongoose | Lưu 12 collection nghiệp vụ; thời gian lưu UTC, hiển thị theo múi giờ người dùng. |
+| `backend/uploads` | Lưu ảnh thuốc cục bộ; phục vụ qua `/uploads`. Không dùng Firebase Storage. |
 
 ## 4. Lý do chọn công nghệ
 
 | Công nghệ | Lý do |
 |---|---|
-| React + Vite + TypeScript | SPA nhanh, khởi động nhanh; TypeScript giảm lỗi; responsive mobile-first dùng được ngay trên điện thoại không cần cài app; dễ chia sẻ qua link cho người thân; cùng ngôn ngữ TypeScript với backend |
-| Node.js + Express (TypeScript) | Cùng ngôn ngữ TypeScript với web; bất đồng bộ phù hợp I/O; đơn giản cho MVP |
-| MongoDB + Mongoose | Quy tắc nghiệp vụ đảm bảo bằng atomic update (`findOneAndUpdate` với filter trạng thái) + unique index (một lần uống chỉ một xác nhận); Mongoose hỗ trợ TypeScript. Đổi từ MySQL theo yêu cầu người dùng 19/10/2026; standalone MongoDB không hỗ trợ multi-document transaction nên thao tác tạo thuốc nhiều collection không dùng transaction (chấp nhận cho MVP) |
-| Web Push (FCM for Web + Service Worker) | Miễn phí trên Spark; server gửi được khi trang đóng; một cơ chế chạy trên mọi trình duyệt (desktop/mobile); node-cron có sẵn làm lịch nhắc tập trung — thay Notifee sau khi đổi nền tảng sang web (19/10/2026) |
-| PWA (manifest + Service Worker) | Bắt buộc để Web Push hoạt động trên iOS Safari (“Thêm vào màn hình chính”); icon trên màn hình điện thoại cho cảm giác như app |
-| node-cron | Đủ cho quy mô MVP (single instance); ít phụ thuộc hơn hàng đợi + Redis; dễ kiểm thử. Nếu mở rộng nhiều instance sẽ cân nhắc lại (ghi nhận trong mở rộng) |
-| Firebase Auth Email + Mật khẩu | Miễn phí trên Spark plan; backend xác minh ID token chuẩn (Phone/OTP bị loại vì Spark không hỗ trợ) |
-
-**Đánh giá kênh thông báo (yêu cầu của PLAN)**: **server (node-cron) gửi Web Push làm kênh chính** vì trình duyệt không tự nhắc khi tab đã đóng — lịch nhắc phải nằm tập trung ở server. Push hiển thị qua Service Worker; trang đang mở thì hiện ngay trong trang (banner + âm thanh) cho thao tác nhanh. Nhược điểm: Web Push phụ thuộc quyền trình duyệt, mạng và trên iOS Safari phải cài PWA — NOTIFICATION_PLAN.md nêu biện pháp và giới hạn.
+| Expo + React Native + Expo Router | Một mã nguồn cho Android/iOS và Expo Web; điều hướng file-based; phù hợp ứng dụng mobile-first và dễ mở rộng. |
+| TypeScript | Dùng chung ngôn ngữ với backend, giảm lỗi hợp đồng API và kiểu dữ liệu. |
+| Node.js + Express | Bất đồng bộ phù hợp I/O, đơn giản cho MVP, dễ tách route/service. |
+| MongoDB + Mongoose | Mô hình tài liệu linh hoạt; atomic update (`findOneAndUpdate`) cho chuyển trạng thái lần uống; unique/partial index chống trùng. |
+| Firebase Authentication | Đăng nhập email/mật khẩu, ID token chuẩn; backend xác minh bằng Firebase Admin. |
+| FCM / Expo Push | Gửi push từ server khi app đóng; native dùng Expo Push/FCM, Expo Web dùng FCM Web Push + Service Worker. |
+| node-cron | Đủ cho MVP một instance; không cần hàng đợi/Redis. Nếu chạy nhiều instance cần cơ chế khóa. |
 
 ## 5. Quy tắc kỹ thuật chung
 
-- Toàn bộ API trong một backend Express. Mọi endpoint yêu cầu Firebase ID token hợp lệ, trừ endpoint health check được ghi rõ.
-- Thời gian lưu UTC ở server; hiển thị theo múi giờ người dùng (mặc định Asia/Ho_Chi_Minh).
-- Phản hồi JSON thống nhất: `{ success, data?, error? { code, message } }` — chi tiết ở API_SPEC.md.
-- Log không chứa dữ liệu nhạy cảm, token, khóa dịch vụ, **mật khẩu do admin đặt lại**.
-- Phân quyền vận hành kiểm tra ở `authMiddleware` (`users.role`) + `requireStaffMiddleware`/`requireAdminMiddleware`; không tin cờ phía client. Tài khoản có `disabled_at` bị chặn 403 trước khi vào route.
-- Biến môi trường: `NODE_ENV`, `PORT`, `MONGODB_URI`, `FIREBASE_PROJECT_ID`, `TZ_DEFAULT` — mẫu ở `.env.example`.
+- Toàn bộ API nghiệp vụ nằm dưới `/api/v1`; `/health` và `/uploads` nằm ngoài prefix này.
+- Mọi endpoint dưới `/api/v1` đều đi qua `authMiddleware`; route tự yêu cầu `requireAuthMiddleware` hoặc `requireFirebaseAuthMiddleware`.
+- Thời gian lưu UTC; ngày/giờ hiển thị theo `users.timezone` (mặc định `Asia/Ho_Chi_Minh`).
+- Phản hồi JSON thống nhất: `{ success, data?, error? { code, message } }`.
+- Log không chứa mật khẩu, token, khóa dịch vụ hay dữ liệu y tế nhạy cảm.
+- Tài khoản có `disabled_at` bị chặn 403 trước khi vào route.
+- Biến môi trường chính: `PORT`, `MONGODB_URI`, `TZ_DEFAULT`, `ENABLE_CRON`, `DOSE_GENERATION_DAYS`, `RELATIVE_ALERT_AFTER_MINUTES`, `WELLNESS_CHECK_AFTER_MINUTES`, `FIREBASE_*`, `CORS_ORIGIN`.
 - Cấu trúc thư mục:
 
+```text
+backend/   src/config, middlewares, models, routes, services, jobs, utils, scripts
+mobile/    src/app (Expo Router), src/components, services, store, hooks, theme, types, utils, public/
+tools/     diagram-generator
+docs/      tài liệu dự án và sơ đồ
 ```
-backend/  src/config, src/middlewares, src/models, src/routes, src/controllers, src/services, src/jobs, src/utils, tests/
-web/      src/screens (M01–M08 + Admin), src/components, src/services, src/store, src/hooks, src/theme, src/types, src/__tests__/, public/ (manifest.webmanifest, sw.js, icons)
-docs/     tài liệu PLAN
-```
 
----
+## 6. Giới hạn hiện tại
 
-## Điểm cần duyệt
-
-1. Đánh giá “server node-cron gửi Web Push làm kênh chính, hiển thị trong trang khi trang mở” ở mục 4.
-2. node-cron single-instance cho MVP — chấp nhận giới hạn nếu chạy đa instance sau này.
-3. Cấu trúc thư mục backend/ + web/ ở mục 5.
+- Push phụ thuộc quyền thông báo, mạng và chính sách hệ điều hành; có thể trễ.
+- iOS native push cần tài khoản Apple Developer và cấu hình APNs.
+- Expo Web cần HTTPS công khai để FCM Web Push hoạt động ổn định ngoài localhost/LAN.
+- node-cron chỉ chạy trên một instance; chạy nhiều instance cần khóa phân tán.
+- Phạm vi sức khỏe chỉ là tuân thủ uống thuốc và hỏi thăm cảm giác sau uống; không chẩn đoán hay tư vấn y tế.

@@ -1,5 +1,4 @@
 import { Schema, model, Document } from 'mongoose';
-import { objectId } from './schemaHelpers';
 
 /** Vai trò tài khoản: người dùng · quản lý vận hành · quản trị hệ thống */
 export type UserRole = 'user' | 'manager' | 'admin';

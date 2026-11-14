@@ -1,50 +1,65 @@
-# PlantUML diagrams
+# Bộ sơ đồ MedReminder
 
-Bo so do mo ta he thong MedReminder theo cac tai lieu du an va ma nguon backend/web.
+Tất cả file PlantUML nằm trong `source/` và được đặt tên theo **số thứ tự + loại sơ đồ** để dễ nhận biết.
 
-## Danh sach so do
+- `so-do-kien-truc`, `so-do-chuc-nang`, `so-do-dieu-huong`, `so-do-du-lieu-erd`: sơ đồ cấu trúc/nền tảng.
+- `so-do-trang-thai-...`: sơ đồ trạng thái (state machine).
+- `so-do-trinh-tu-...`: sơ đồ trình tự (sequence diagram).
+- `danh-muc-api`: danh mục endpoint, không phải sơ đồ luồng.
 
-### Tong quan va thiet ke
-- `source/architecture.puml` — kien truc Web PWA, Express API, MongoDB, Firebase Auth/FCM va node-cron.
-- `source/use-case.puml` — tac nhan va cac chuc nang theo vai tro.
-- `source/screen-navigation.puml` — dieu huong M01–M08 va khu van hanh `/admin`.
-- `source/erd.puml` — cac collection va quan he logic trong MongoDB.
-- `source/api-routes.puml` — danh muc endpoint API; doi chieu voi `backend/src/app.ts`, `backend/src/routes/` va `docs/API_SPEC.md`.
+## Bảng phân loại
 
-### Luong nghiep vu
-- `source/sequence-login.puml` — Firebase Authentication va dong bo ho so.
-- `source/sequence-add-medication.puml` — tao thuoc, lich, phien ban lich va audit log.
-- `source/sequence-confirm-dose.puml` — xac nhan lan uong, kiem tra quyen va idempotency.
-- `source/dose-state-machine.puml` — cac trang thai lan uong va dieu kien chuyen.
-- `source/sequence-push-notification.puml` — cron, FCM va Service Worker.
-- `source/sequence-family-invite.puml` — tao ma moi va ket noi nguoi than.
-- `source/sequence-relative-alert.puml` — gui canh bao nguoi than khi qua nguong chua xac nhan.
-- `source/sequence-admin-lock.puml` — luong khoa/mo tai khoan qua khu van hanh.
+| STT | File | Loại sơ đồ | Nội dung |
+|---|---|---|---|
+| 01 | `source/01-so-do-kien-truc.puml` | Kiến trúc (component) | Expo app native + Expo Web, Express API, MongoDB, Firebase Auth, FCM/Expo Push, node-cron, uploads cục bộ |
+| 02 | `source/02-so-do-chuc-nang.puml` | Use case | Tác nhân và chức năng theo vai trò chủ hồ sơ, người thân, manager, admin |
+| 03 | `source/03-so-do-dieu-huong.puml` | Điều hướng màn hình | Expo Router: tabs, stack, deep link từ push, tab Vận hành theo vai trò |
+| 04 | `source/04-so-do-du-lieu-erd.puml` | ERD | 12 collection MongoDB và quan hệ logic |
+| 05 | `source/05-so-do-trang-thai-lan-uong.puml` | State machine | Trạng thái lần uống và điều kiện chuyển |
+| 06 | `source/06-danh-muc-api.puml` | Danh mục API | 40 endpoint, có mount prefix `/api/v1` |
+| 07 | `source/07-so-do-trinh-tu-dang-nhap.puml` | Sequence | Firebase Auth, đồng bộ hồ sơ, đăng ký thiết bị |
+| 08 | `source/08-so-do-trinh-tu-them-thuoc.puml` | Sequence | Tạo thuốc, lịch, phiên bản lịch và audit log |
+| 09 | `source/09-so-do-trinh-tu-xac-nhan-uong.puml` | Sequence | Xác nhận lần uống, kiểm tra quyền và idempotency |
+| 10 | `source/10-so-do-trinh-tu-gui-push.puml` | Sequence | Cron, chọn payload, FCM/Expo Push và deep link |
+| 11 | `source/11-so-do-trinh-tu-moi-nguoi-than.puml` | Sequence | Tạo mã mời, giới hạn tần suất và kết nối người thân |
+| 12 | `source/12-so-do-trinh-tu-canh-bao-nguoi-than.puml` | Sequence | Cảnh báo người thân khi lần uống chưa xác nhận hoặc `cannot_take` |
+| 13 | `source/13-so-do-trinh-tu-hoi-tham-suc-khoe.puml` | Sequence | Push hỏi thăm sức khỏe 10 phút sau khi xác nhận và lưu câu trả lời |
+| 14 | `source/14-so-do-trinh-tu-admin-khoa-tai-khoan.puml` | Sequence | Khóa/mở tài khoản qua khu vận hành |
 
-## Tao va xem so do (PowerShell)
+Hiện bộ sơ đồ **không có activity diagram riêng**. Các luồng hoạt động được mô tả bằng:
 
-Chay tu thu muc goc repository:
+- **Sequence diagram**: các file `07`–`14`.
+- **State machine**: file `05` cho vòng đời lần uống.
+
+Nếu cần activity diagram cho một luồng cụ thể (ví dụ xác nhận uống hoặc gửi push), có thể bổ sung sau.
+
+## Tạo và xem sơ đồ (PowerShell)
+
+Chạy từ thư mục gốc repository:
 
 ```powershell
 node tools/diagram-generator/generate.mjs
 node tools/diagram-generator/generate.mjs render
 ```
 
-Lenh `generate` tao lai danh muc route tu cac khai bao route tinh trong `backend/src/routes/*.ts`. Lenh `render` can Java va PlantUML CLI co trong PATH (hoac bien `PLANTUML_CMD`); SVG va PNG se duoc tao ben canh file `.puml`.
+Lệnh `generate` tạo lại `source/06-danh-muc-api.puml` từ các khai báo tĩnh trong `backend/src/routes/*.ts` và đọc mount prefix từ `backend/src/app.ts`, nên nhãn hiển thị đầy đủ dạng `GET /api/v1/users/me`.
 
-Theo doi route khi dang phat trien:
+Lệnh `render` cần Java và PlantUML CLI trong `PATH` (hoặc biến `PLANTUML_CMD`); SVG/PNG được tạo cạnh file `.puml`.
+
+Theo dõi route khi đang phát triển:
 
 ```powershell
 node tools/diagram-generator/generate.mjs watch
 ```
 
-Watch mode tu dong tao lai danh muc route. Khi logic nghiep vu trong service/model thay doi, can xem lai cac sequence diagram da viet tay; khong the suy ra dung y nghia nghiep vu tu moi thay doi TypeScript.
+Watch mode tự động tạo lại danh mục route. Khi logic nghiệp vụ trong service/model thay đổi, cần xem lại các sơ đồ trình tự viết tay; không thể suy ra đúng ý nghĩa nghiệp vụ chỉ từ thay đổi TypeScript.
 
-## Pham vi va gioi han
+## Phạm vi và giới hạn
 
-- Cac so do la tai lieu ky thuat, khong thay the API spec, business rules hay test plan.
-- Route inventory phu thuoc vao khai bao tinh `router.get/post/put/patch/delete(..., '/path', ...)`; route dong co the khong duoc phat hien.
-- ERD mo ta quan he logic; du lieu thuc te luu trong MongoDB voi ObjectId.
-- Push co the tre do mang, quyen thong bao, trinh duyet va chinh sach he dieu hanh; iOS Safari can PWA duoc them vao man hinh chinh.
-- Pham vi “theo doi suc khoe” hien tai la tuan thu uong thuoc (M01/M06), khong chan doan hay tu van y te.
-- Khong dua `.env`, khoa Firebase, token hay du lieu nguoi dung vao cac so do.
+- Sơ đồ là tài liệu kỹ thuật, không thay thế API spec, business rules hay test plan.
+- Route inventory phụ thuộc khai báo tĩnh `router.get/post/put/patch/delete(..., '/path', ...)`; route dựng động có thể không được phát hiện.
+- ERD mô tả quan hệ logic; dữ liệu thực tế lưu trong MongoDB với `ObjectId`.
+- Push có thể trễ do mạng, quyền thông báo, trình duyệt và chính sách hệ điều hành.
+- iOS native push cần tài khoản Apple Developer và cấu hình APNs; Expo Web cần HTTPS công khai để FCM Web Push ổn định ngoài localhost/LAN.
+- Phạm vi “theo dõi sức khỏe” hiện tại là tuân thủ uống thuốc và hỏi thăm cảm giác sau uống, không chẩn đoán hay tư vấn y tế.
+- Không đưa `.env`, khóa Firebase, token hay dữ liệu người dùng vào sơ đồ.

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "17863850068",
+    "project_id": "medicationreminder-6177c",
+    "storage_bucket": "medicationreminder-6177c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:17863850068:android:d951963bae8b72b95195c1",
+        "android_client_info": {
+          "package_name": "com.doduongw.medreminder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwufhjzGrvNWR3gfMV0cIP8VobxeI1KLQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Card, Button, Input, StateView, Text, TimeField } from '../../components';
+import { Card, Button, DateField, Input, StateView, Text, TimeField } from '../../components';
 import { colors, spacing, typography } from '../../theme';
 import {
   addSchedule,
@@ -21,10 +21,10 @@ import {
   removeSchedule,
   updateMedication,
   updateSchedule,
+  uploadMedicationImage,
 } from '../../services/endpoints';
 import type { Medication } from '../../types';
 import { validateMedicationForm } from '../../utils/validation';
-import { uploadImageToStorage } from '../../services/firebase';
 
 interface TimeEntry {
   key: string;
@@ -75,10 +75,7 @@ export default function MedicationDetailScreen() {
       if (result.canceled || !result.assets?.[0]?.uri) return;
       setImageUploading(true);
       const uri = result.assets[0].uri;
-      const extGuess = uri.split('.').pop()?.toLowerCase().split('?')[0];
-      const ext = extGuess && /^[a-z0-9]+$/.test(extGuess) ? extGuess : 'jpg';
-      const path = `medication-images/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-      const downloadUrl = await uploadImageToStorage(uri, path);
+      const downloadUrl = await uploadMedicationImage(uri);
       setImageUrl(downloadUrl);
     } catch (e: any) {
       setImageError(e?.message || 'Không tải ảnh lên được. Vui lòng thử lại.');
@@ -113,6 +110,8 @@ export default function MedicationDetailScreen() {
   }, [medId]);
 
   useEffect(() => {
+    // Tải dữ liệu ban đầu; setState diễn ra sau khi gọi API.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -296,7 +295,7 @@ export default function MedicationDetailScreen() {
             <View style={styles.timesHeader}>
               <Text style={styles.sectionTitle}>Giờ uống trong ngày</Text>
             </View>
-            <Text style={styles.muted}>Chỉnh trực tiếp từng ô giờ (định dạng 24h HH:mm, ví dụ 07:30, 12:00, 20:30). Bấm “Lưu thay đổi” để áp dụng — nếu đổi lịch, hệ thống sẽ hỏi xác nhận (lịch mới áp dụng cho các lần sắp tới, lịch sử giữ nguyên).</Text>
+            <Text style={styles.muted}>Bấm vào ô giờ để chọn nhanh (giờ/phút có sẵn) hoặc nhập trực tiếp HH:mm. Bấm “Lưu thay đổi” để áp dụng — nếu đổi lịch, hệ thống sẽ hỏi xác nhận (lịch mới áp dụng cho các lần sắp tới, lịch sử giữ nguyên).</Text>
             {times.map((entry, index) => (
               <View key={entry.key} style={styles.timeRow}>
                 <View style={{ flex: 1 }}>
@@ -326,13 +325,23 @@ export default function MedicationDetailScreen() {
 
           <Card style={styles.card}>
             <Text style={styles.sectionTitle}>Thời gian dùng thuốc</Text>
-            <Text style={styles.label}>Ngày bắt đầu (YYYY-MM-DD) <Text style={styles.req}>*</Text></Text>
-            <Input value={startDate} onChangeText={setStartDate} autoCapitalize="none" />
-            {errors.startDate ? <Text style={styles.errText}>{errors.startDate}</Text> : null}
-
-            <Text style={styles.label}>Ngày kết thúc (tùy chọn)</Text>
-            <Input value={endDate} onChangeText={setEndDate} autoCapitalize="none" placeholder="Để trống nếu dùng không có hạn" />
-            {errors.endDate ? <Text style={styles.errText}>{errors.endDate}</Text> : null}
+            <DateField
+              label="Ngày bắt đầu *"
+              value={startDate}
+              onChange={setStartDate}
+              error={errors.startDate}
+              disabled={!isActive}
+            />
+            <DateField
+              label="Ngày kết thúc (tùy chọn)"
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="Để trống nếu dùng không có hạn"
+              error={errors.endDate}
+              defaultValue={startDate}
+              disabled={!isActive}
+              clearable
+            />
           </Card>
 
           {serverError ? <Text style={styles.errText}>{serverError}</Text> : null}

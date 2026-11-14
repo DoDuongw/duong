@@ -5,8 +5,12 @@ dist/
 .env.*
 !.env.example
 *.log
-web/dist/
 coverage/
+backend/uploads/
+
+# Local mobile build artifacts
+*.apk
+*.aab
 
 # Firebase service account — TUYỆT ĐỐI không commit
 *serviceAccountKey*.json

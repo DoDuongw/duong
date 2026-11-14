@@ -2,7 +2,7 @@ import { Schema, model, Document } from 'mongoose';
 import { objectId } from './schemaHelpers';
 
 /** Câu trả lời nhanh cho push hỏi thăm sức khỏe. */
-export type HealthAnswer = 'good' | 'tired' | 'dizzy' | 'unwell' | 'other';
+type HealthAnswer = 'good' | 'tired' | 'dizzy' | 'unwell' | 'other';
 
 /**
  * Nhật ký sức khỏe: mỗi push hỏi thăm sau khi uống thuốc được lưu thành một mục

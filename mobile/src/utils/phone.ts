@@ -1,9 +1,9 @@
 /**
  * Nhận dạng và chuẩn hoá số điện thoại / email đăng nhập.
- * Quy tắc giống web/src/utils/phone.ts và backend/src/utils/profile.ts.
+ * Quy tắc giống backend/src/utils/profile.ts.
  */
 
-export const PHONE_EMAIL_DOMAIN = 'med.local';
+const PHONE_EMAIL_DOMAIN = 'med.local';
 
 const LOCAL_PHONE_PATTERN = /^0[35789]\d{8}$/;
 
@@ -30,15 +30,6 @@ export function looksLikePhone(input: string): boolean {
   const trimmed = input.trim();
   if (trimmed === '' || trimmed.includes('@')) return false;
   return /^[+\d][\d\s.\-()]*$/.test(trimmed);
-}
-
-export function isInternalPhoneEmail(email: string): boolean {
-  return email.endsWith(`@${PHONE_EMAIL_DOMAIN}`);
-}
-
-export function phoneFromInternalEmail(email: string): string | null {
-  if (!isInternalPhoneEmail(email)) return null;
-  return email.slice(0, -(`@${PHONE_EMAIL_DOMAIN}`.length));
 }
 
 export function isValidAddress(input: string): boolean {

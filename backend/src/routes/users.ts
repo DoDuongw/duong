@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { User } from '../models/User';
+import { User, UserDoc } from '../models/User';
 import { Device } from '../models/Device';
 import { ok } from '../middlewares/errorHandler';
 import { requireAuthMiddleware, currentUserId, requireFirebaseAuthMiddleware } from '../middlewares/auth';
@@ -55,7 +55,7 @@ const addressField = z
     return trimmed;
   });
 
-const syncSchema = z.object({
+const profileSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   phone: phoneField.optional(),
   address: addressField.optional(),
@@ -75,10 +75,37 @@ const syncSchema = z.object({
     }, 'Ngày sinh không hợp lệ'),
 });
 
+type ProfileInput = z.infer<typeof profileSchema>;
+
+function profileUpdates(data: ProfileInput): Record<string, unknown> {
+  const updates: Record<string, unknown> = {};
+  if (data.displayName !== undefined) updates.display_name = data.displayName;
+  if (data.phone !== undefined) updates.phone = data.phone;
+  if (data.address !== undefined) updates.address = data.address;
+  if (data.timezone !== undefined) updates.timezone = data.timezone;
+  if (data.preferences !== undefined) updates.preferences = data.preferences;
+  if (data.dateOfBirth !== undefined) updates.date_of_birth = new Date(data.dateOfBirth);
+  return updates;
+}
+
+function userJson(user: UserDoc) {
+  return {
+    id: user._id,
+    phone: user.phone,
+    displayName: user.display_name,
+    address: user.address,
+    timezone: user.timezone,
+    preferences: user.preferences,
+    role: user.role ?? 'user',
+    emailVerified: Boolean(user.email_verified_at),
+    dateOfBirth: user.date_of_birth ? new Date(user.date_of_birth).toISOString().slice(0, 10) : null,
+  };
+}
+
 // Lần đăng nhập đầu tiên chưa có bản ghi user → chỉ cần token hợp lệ, route tự tạo bản ghi
 router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const parsed = syncSchema.safeParse(req.body ?? {});
+    const parsed = profileSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequest(parsed.error.errors.map((e) => e.message).join('; '));
 
     const { uid } = req.user!;
@@ -105,13 +132,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
         if (!user) throw e;
       }
     } else {
-      const updates: Record<string, unknown> = {};
-      if (parsed.data.displayName !== undefined) updates.display_name = parsed.data.displayName;
-      if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
-      if (parsed.data.address !== undefined) updates.address = parsed.data.address;
-      if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
-      if (parsed.data.preferences !== undefined) updates.preferences = parsed.data.preferences;
-      if (parsed.data.dateOfBirth !== undefined) updates.date_of_birth = new Date(parsed.data.dateOfBirth);
+      const updates = profileUpdates(parsed.data);
       if (Object.keys(updates).length > 0) {
         user = await User.findByIdAndUpdate(user._id, updates, { new: true });
       }
@@ -120,17 +141,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
     req.user!.userId = user!._id.toString();
     req.user!.role = user!.role ?? 'user';
     req.user!.isAdmin = user!.role === 'admin' ? true : undefined;
-    ok(res, {
-      id: user!._id,
-      phone: user!.phone,
-      displayName: user!.display_name,
-      address: user!.address,
-      timezone: user!.timezone,
-      preferences: user!.preferences,
-      role: user!.role ?? 'user',
-      emailVerified: Boolean((user as any).email_verified_at),
-      dateOfBirth: (user as any).date_of_birth ? new Date((user as any).date_of_birth).toISOString().slice(0, 10) : null,
-    });
+    ok(res, userJson(user!));
   } catch (e) {
     next(e);
   }
@@ -140,67 +151,20 @@ router.get('/me', requireAuthMiddleware, async (req: Request, res: Response, nex
   try {
     const user = await User.findById(currentUserId(req));
     if (!user) throw notFound('Không tìm thấy người dùng');
-    ok(res, {
-      id: user._id,
-      phone: user.phone,
-      displayName: user.display_name,
-      address: user.address,
-      timezone: user.timezone,
-      preferences: user.preferences,
-      role: user.role ?? 'user',
-      emailVerified: Boolean((user as any).email_verified_at),
-      dateOfBirth: (user as any).date_of_birth ? new Date((user as any).date_of_birth).toISOString().slice(0, 10) : null,
-    });
+    ok(res, userJson(user));
   } catch (e) {
     next(e);
   }
 });
 
-const patchSchema = z.object({
-  displayName: z.string().min(1).max(100).optional(),
-  phone: phoneField.optional(),
-  address: addressField.optional(),
-  timezone: z.string().min(1).max(50).optional(),
-  preferences: z.record(z.unknown()).optional(),
-  dateOfBirth: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .refine((v) => {
-      if (!v) return true;
-      const d = new Date(v);
-      if (Number.isNaN(d.getTime())) return false;
-      if (d > new Date()) return false;
-      const age = (Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000);
-      return age >= 0 && age <= 120;
-    }, 'Ngày sinh không hợp lệ'),
-});
-
 router.patch('/me', requireAuthMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const parsed = patchSchema.safeParse(req.body ?? {});
+    const parsed = profileSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequest(parsed.error.errors.map((e) => e.message).join('; '));
-    const updates: Record<string, unknown> = {};
-    if (parsed.data.displayName !== undefined) updates.display_name = parsed.data.displayName;
-    if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
-    if (parsed.data.address !== undefined) updates.address = parsed.data.address;
-    if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
-    if (parsed.data.preferences !== undefined) updates.preferences = parsed.data.preferences;
-    if (parsed.data.dateOfBirth !== undefined) updates.date_of_birth = new Date(parsed.data.dateOfBirth);
 
-    const user = await User.findByIdAndUpdate(currentUserId(req), updates, { new: true });
+    const user = await User.findByIdAndUpdate(currentUserId(req), profileUpdates(parsed.data), { new: true });
     if (!user) throw notFound('Không tìm thấy người dùng');
-    ok(res, {
-      id: user._id,
-      phone: user.phone,
-      displayName: user.display_name,
-      address: user.address,
-      timezone: user.timezone,
-      preferences: user.preferences,
-      role: user.role ?? 'user',
-      emailVerified: Boolean((user as any).email_verified_at),
-      dateOfBirth: (user as any).date_of_birth ? new Date((user as any).date_of_birth).toISOString().slice(0, 10) : null,
-    });
+    ok(res, userJson(user));
   } catch (e) {
     next(e);
   }
@@ -252,7 +216,9 @@ router.post('/devices/register', requireAuthMiddleware, async (req: Request, res
       });
     } else {
       device.user_id = currentUserId(req) as never;
+      device.platform = parsed.data.platform;
       device.status = 'active';
+      device.notifications_enabled = true;
       device.last_seen_at = new Date();
       await device.save();
     }

@@ -1,0 +1,55 @@
+@startuml
+title Trình tự push hỏi thăm sức khỏe sau khi uống thuốc
+autonumber
+participant "node-cron\n(mỗi phút)" as Cron
+participant "notificationService" as Service
+database "MongoDB" as DB
+participant "Expo Push / FCM" as Push
+participant "Thiết bị\n(expo-notifications / SW)" as Device
+actor "Chủ hồ sơ" as User
+participant "Express API\nhealth-logs route" as API
+participant "health-journal\n(mobile/)" as Journal
+
+Cron -> Service : processDueNotifications()
+Service -> DB : tìm dose confirmed có\nconfirmed_at <= now - 10 phút\nvà > now - 15 phút
+DB --> Service : danh sách dose
+
+loop từng dose
+  Service -> Service : notifyDoseWellnessCheck(doseId)
+  alt dose không còn confirmed, chưa đủ 10 phút hoặc thuốc đã ngừng
+    Service --> Service : bỏ qua
+  else đủ điều kiện
+    Service -> DB : kiểm tra NotificationLog\n(dose + wellness_check)
+    alt đã gửi hoặc đã thử 3 lần
+      Service --> Service : bỏ qua
+    else chưa gửi
+      Service -> DB : upsert HealthLog theo dose_id\n(question, asked_at, answer=null)
+      DB --> Service : healthLogId
+      Service -> Service : payload có healthLogId +\ncategory wellness_check +\nurl /health-journal?logId=...
+      Service -> DB : lấy Device active của chủ hồ sơ
+      Service -> Push : gửi push
+      Push --> Device : notification hỏi thăm
+      Device --> User : banner + 3 lựa chọn nhanh
+      Service -> DB : ghi NotificationLog\n+ NotificationHistory
+    end
+  end
+end
+
+alt bấm lựa chọn nhanh trên banner
+  User -> Device : Bình thường / Hơi mệt / Khó chịu
+  Device -> Journal : mở /health-journal?logId=...&answer=...
+else mở từ tab Thông báo / Hồ sơ
+  User -> Journal : mở nhật ký sức khỏe
+end
+Journal -> API : PATCH /api/v1/health-logs/{id}\n{ answer, note }
+API -> DB : lưu answer, answer_note, answered_at\n(theo user_id)
+DB --> API : HealthLog đã cập nhật
+API --> Journal : JSON
+Journal --> User : hiển thị câu trả lời
+
+note over Cron,Service
+  Mặc định WELLNESS_CHECK_AFTER_MINUTES=10.
+  Cửa sổ bắt kịp 5 phút để tránh gửi muộn sau khi server downtime.
+  Mỗi lần uống chỉ có một HealthLog và một sự kiện push wellness_check.
+end note
+@enduml

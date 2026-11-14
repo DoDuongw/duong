@@ -1,6 +1,6 @@
-/** Kiểm tra đầu vào — parity với web/src/utils/validation.ts */
+/** Kiểm tra đầu vào dùng chung cho form thuốc. */
 
-export function isValidTime(value: string): boolean {
+function isValidTime(value: string): boolean {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
   if (!match) return false;
   const hour = Number(match[1]);
@@ -8,14 +8,14 @@ export function isValidTime(value: string): boolean {
   return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
 }
 
-export function isValidDate(value: string): boolean {
+function isValidDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split('-').map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
-export function isEndAfterStart(start: string, end: string): boolean {
+function isEndAfterStart(start: string, end: string): boolean {
   return end >= start;
 }
 

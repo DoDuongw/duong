@@ -4,7 +4,7 @@ export type UserRole = 'user' | 'manager' | 'admin';
 
 export type MedicationStatus = 'active' | 'discontinued';
 
-export type ScheduleStatus = 'active' | 'archived';
+type ScheduleStatus = 'active' | 'archived';
 
 export interface UserPreferences {
   fontScale?: 'sm' | 'md' | 'lg';
@@ -90,6 +90,21 @@ export interface DayDoses {
   doses: DoseWithMedication[];
 }
 
+export interface DoseRangeDay {
+  date: string;
+  total: number;
+  confirmed: number;
+  remaining: number;
+  missed: number;
+  cannotTake: number;
+}
+
+export interface DoseRange {
+  from: string;
+  to: string;
+  days: DoseRangeDay[];
+}
+
 export interface HistoryItem extends Dose {
   medicationName: string | null;
   remindedAt: string | null;
@@ -129,7 +144,7 @@ export interface HealthLogPage {
 }
 
 /** Loại push đã gửi cho người dùng. */
-export type NotificationKind =
+type NotificationKind =
   | 'scheduled_reminder'
   | 'overdue'
   | 'snooze'
@@ -146,6 +161,8 @@ export interface NotificationHistoryItem {
   body: string;
   data: Record<string, unknown> | null;
   sentAt: string;
+  status: 'sent' | 'failed' | 'expired';
+  error: string | null;
 }
 
 export interface NotificationHistoryPage {
@@ -153,16 +170,6 @@ export interface NotificationHistoryPage {
   page: number;
   pageSize: number;
   total: number;
-}
-
-export interface ApiSuccess<T> {
-  success: true;
-  data: T;
-}
-
-export interface ApiFailure {
-  success: false;
-  error: { code: string; message: string };
 }
 
 export interface FamilyPermissions {
@@ -182,6 +189,22 @@ export interface FamilyConnectionItem {
 export interface FamilyInviteCreated {
   code: string;
   expiresAt: string;
+}
+
+export interface FamilyAlertItem {
+  id: string;
+  doseId: string;
+  ownerId: string;
+  ownerName: string;
+  ownerTimezone: string;
+  medicationName: string;
+  imageUrl?: string | null;
+  scheduledAt: string;
+  status: string;
+  cannotTakeReason: string | null;
+  sentAt: string;
+  deliveryStatus: 'sent' | 'failed' | 'expired';
+  deliveryError: string | null;
 }
 
 export interface AdminSummary {

@@ -110,11 +110,6 @@ export async function setFirebaseUserDisabled(uid: string, disabled: boolean): P
   await requireAuth().updateUser(uid, { disabled });
 }
 
-/** Đặt mật khẩu mới (dùng cho tài khoản email nội bộ <sđt>@med.local không nhận được email đặt lại) */
-export async function setFirebaseUserPassword(uid: string, password: string): Promise<void> {
-  await requireAuth().updateUser(uid, { password });
-}
-
 /** Thu hồi refresh token — phiên cũ hết hiệu lực (ID token tối đa 1 giờ) */
 export async function revokeFirebaseRefreshTokens(uid: string): Promise<void> {
   await requireAuth().revokeRefreshTokens(uid);
@@ -129,18 +124,6 @@ export async function getFirebaseUserByEmail(email: string): Promise<{ uid: stri
     if ((err as { code?: string }).code === 'auth/user-not-found') return null;
     throw err;
   }
-}
-
-/** Lấy email của nhiều uid trong MỘT lần gọi (tối đa 100) — danh sách admin chỉ đọc */
-export async function getFirebaseUserEmails(uids: string[]): Promise<Record<string, string | null>> {
-  const result: Record<string, string | null> = {};
-  if (uids.length === 0) return result;
-  const auth = requireAuth();
-  const batch = uids.slice(0, 100);
-  const found = await auth.getUsers(batch.map((uid) => ({ uid })));
-  for (const uid of batch) result[uid] = null;
-  for (const user of found.users) result[user.uid] = user.email ?? null;
-  return result;
 }
 
 export interface FirebaseUserDetail {

@@ -1,20 +1,18 @@
 # DATABASE PLAN — MongoDB + Mongoose
 
-> **Cập nhật 19/10/2026**: chuyển từ MySQL + Sequelize sang **MongoDB + Mongoose** theo yêu cầu người dùng. Tài liệu dưới đây mô hình quan hệ logic vẫn đúng; thay đổi khi triển khai:
->
-> - `id` BIGINT auto-increment → `_id` ObjectId (API trả về dạng chuỗi).
-> - Ràng buộc unique → unique index (đặc biệt `{schedule_id, scheduled_at}` cho lần uống, `{owner_id, relative_id}` partial index cho kết nối đang active).
-> - Transaction multi-document → **atomic update** (`findOneAndUpdate` với filter trạng thái) cho chuyển trạng thái lần uống; standalone MongoDB không hỗ trợ transaction nên thao tác tạo thuốc (medication + schedules + versions) chạy tuần tự, chấp nhận cho MVP.
-> - Collection: `users`, `devices`, `medications`, `medicationschedules`, `scheduleversions`, `doseoccurrences`, `familyinvites`, `familyconnections`, `notificationlogs`, `auditlogs`.
+> Tài liệu này phản ánh mô hình dữ liệu hiện tại trong `backend/src/models/`.
+> Hệ thống dùng **MongoDB + Mongoose**, khóa chính là `_id` kiểu `ObjectId`.
 
 ## 1. Nguyên tắc
 
-- Mọi bản ghi có `_id` (ObjectId) và timestamps `createdAt`/`updatedAt`.
-- Thời gian lưu kiểu `DATETIME` (UTC) ở server; hiển thị theo múi giờ người dùng (mặc định Asia/Ho_Chi_Minh).
-- Mọi dữ liệu gắn với chủ sở hữu (`user_id`); backend kiểm tra quyền trước mọi đọc/ghi.
-- Ràng buộc unique để một lần uống chỉ có một bản xác nhận; cập nhật trạng thái dùng atomic update (`findOneAndUpdate`).
-- Không lưu mật khẩu, khóa dịch vụ Firebase hay token nhạy cảm trong mã nguồn; token FCM web (đăng ký qua Service Worker) lưu trong CSDL với trạng thái để hủy khi đăng xuất.
+- Mọi collection dùng `_id` kiểu `ObjectId`; API trả về dạng chuỗi.
+- Thời gian lưu UTC; ngày/giờ nghiệp vụ hiển thị theo `users.timezone` (mặc định `Asia/Ho_Chi_Minh`).
+- Dữ liệu luôn gắn với chủ hồ sơ qua `user_id` hoặc `owner_id`; backend kiểm tra quyền trước mỗi lần đọc/ghi.
+- Chuyển trạng thái lần uống dùng **atomic update** (`findOneAndUpdate` có điều kiện `status`) để tránh ghi đè lịch sử.
+- Tạo thuốc + lịch + phiên bản lịch chạy tuần tự; MVP chấp nhận không dùng transaction đa tài liệu.
 - Xóa thuốc = ngừng theo dõi (`status = discontinued`), không xóa lịch sử lần uống.
+- Không lưu mật khẩu, khóa dịch vụ Firebase hoặc token nhạy cảm trong mã nguồn.
+- Token thiết bị được lưu trong `devices` với trạng thái `active | invalid`.
 
 ## 2. Sơ đồ quan hệ (ER)
 
@@ -22,302 +20,392 @@
 erDiagram
     USERS ||--o{ MEDICATIONS : owns
     USERS ||--o{ MEDICATION_SCHEDULES : owns
-    USERS ||--o{ DEVICES : has
-    USERS ||--o{ FAMILY_CONNECTIONS : requester
-    USERS ||--o{ FAMILY_CONNECTIONS : addressee
-    USERS ||--o{ AUDIT_LOGS : produces
-    MEDICATIONS ||--o{ MEDICATION_SCHEDULES : has
-    MEDICATION_SCHEDULES ||--o{ DOSE_OCCURRENCES : generates
-    MEDICATIONS ||--o{ DOSE_OCCURRENCES : referenced_by
-    MEDICATION_SCHEDULES ||--o{ SCHEDULE_VERSIONS : versions
-    DOSE_OCCURRENCES ||--o{ NOTIFICATION_LOGS : notified_by
-    FAMILY_CONNECTIONS ||--o{ FAMILY_INVITES : uses
+    USERS ||--o{ DOSE_OCCURRENCES : owns
+    USERS ||--o{ DEVICES : registers
     USERS ||--o{ FAMILY_INVITES : creates
+    USERS ||--o{ FAMILY_CONNECTIONS : owner
+    USERS ||--o{ FAMILY_CONNECTIONS : relative
+    USERS ||--o{ NOTIFICATION_HISTORIES : receives
+    USERS ||--o{ HEALTH_LOGS : answers
+    USERS ||--o{ AUDIT_LOGS : actor
+
+    MEDICATIONS ||--o{ MEDICATION_SCHEDULES : has
+    MEDICATIONS ||--o{ DOSE_OCCURRENCES : describes
+    MEDICATIONS ||--o{ HEALTH_LOGS : references
+
+    MEDICATION_SCHEDULES ||--o{ SCHEDULE_VERSIONS : versioned_by
+    MEDICATION_SCHEDULES ||--o{ DOSE_OCCURRENCES : generates
+
+    DOSE_OCCURRENCES ||--o{ NOTIFICATION_LOGS : notified_by
+    DOSE_OCCURRENCES ||--o{ NOTIFICATION_HISTORIES : references
+    DOSE_OCCURRENCES ||--o| HEALTH_LOGS : asks_after
+
+    DEVICES ||--o{ NOTIFICATION_LOGS : receives
+    FAMILY_INVITES ||--o| FAMILY_CONNECTIONS : accepted_into
 
     USERS {
-        bigint id PK
+        ObjectId _id PK
         string firebase_uid UK
         string phone
         string display_name
+        string address
         string timezone
-        json preferences
-        enum role
+        string preferences
+        string role
         datetime disabled_at
+        datetime date_of_birth
+        datetime email_verified_at
+        datetime createdAt
+        datetime updatedAt
     }
+
     MEDICATIONS {
-        bigint id PK
-        bigint user_id FK
+        ObjectId _id PK
+        ObjectId user_id FK
         string name
         string image_url
         string dosage_text
-        text instructions
-        date start_date
-        date end_date
-        enum status
-        bigint created_by
+        string instructions
+        string start_date
+        string end_date
+        string status
+        ObjectId created_by FK
+        ObjectId updated_by FK
+        datetime createdAt
+        datetime updatedAt
     }
+
     MEDICATION_SCHEDULES {
-        bigint id PK
-        bigint medication_id FK
-        bigint user_id FK
-        time time_of_day
+        ObjectId _id PK
+        ObjectId medication_id FK
+        ObjectId user_id FK
+        string time_of_day
         string recurrence_rule
-        date effective_from
-        date effective_to
-        enum status
-        bigint current_version
+        string effective_from
+        string effective_to
+        string status
+        number current_version
+        datetime createdAt
+        datetime updatedAt
     }
+
     SCHEDULE_VERSIONS {
-        bigint id PK
-        bigint schedule_id FK
-        bigint version
-        json snapshot
-        bigint changed_by
+        ObjectId _id PK
+        ObjectId schedule_id FK
+        number version
+        string snapshot
+        ObjectId changed_by FK
+        datetime createdAt
     }
+
     DOSE_OCCURRENCES {
-        bigint id PK
-        bigint schedule_id FK
-        bigint medication_id FK
-        bigint user_id FK
+        ObjectId _id PK
+        ObjectId schedule_id FK
+        ObjectId medication_id FK
+        ObjectId user_id FK
         datetime scheduled_at
         datetime reminded_at
-        enum status
+        string status
         datetime confirmed_at
+        boolean is_late_confirmation
         string cannot_take_reason
         datetime snoozed_until
-        int snooze_count
-        bigint schedule_version
-        bool is_late_confirmation
+        number snooze_count
+        number schedule_version
+        string client_request_id
+        datetime createdAt
+        datetime updatedAt
     }
-    FAMILY_INVITES {
-        bigint id PK
-        bigint owner_id FK
-        string code_hash UK
-        datetime expires_at
-        enum status
-    }
-    FAMILY_CONNECTIONS {
-        bigint id PK
-        bigint owner_id FK
-        bigint relative_id FK
-        bigint invite_id FK
-        enum status
-        json permissions
-        datetime connected_at
-        datetime revoked_at
-    }
+
     DEVICES {
-        bigint id PK
-        bigint user_id FK
+        ObjectId _id PK
+        ObjectId user_id FK
         string fcm_token UK
         string platform
-        bool notifications_enabled
+        string user_agent
+        boolean notifications_enabled
         datetime last_seen_at
-        enum status
+        string status
+        datetime createdAt
+        datetime updatedAt
     }
+
+    FAMILY_INVITES {
+        ObjectId _id PK
+        ObjectId owner_id FK
+        string code_hash UK
+        datetime expires_at
+        string status
+        datetime createdAt
+    }
+
+    FAMILY_CONNECTIONS {
+        ObjectId _id PK
+        ObjectId owner_id FK
+        ObjectId relative_id FK
+        ObjectId invite_id FK
+        string status
+        string permissions
+        datetime connected_at
+        datetime revoked_at
+        datetime createdAt
+        datetime updatedAt
+    }
+
     NOTIFICATION_LOGS {
-        bigint id PK
-        bigint dose_id FK
-        bigint device_id FK
-        enum channel
-        enum kind
+        ObjectId _id PK
+        ObjectId dose_id FK
+        ObjectId device_id FK
+        string channel
+        string kind
         datetime sent_at
-        enum status
+        string status
         string error
     }
+
+    NOTIFICATION_HISTORIES {
+        ObjectId _id PK
+        ObjectId user_id FK
+        string event_key
+        ObjectId dose_id FK
+        string kind
+        string title
+        string body
+        string data
+        string status
+        string error
+        datetime sent_at
+    }
+
+    HEALTH_LOGS {
+        ObjectId _id PK
+        ObjectId user_id FK
+        ObjectId dose_id FK
+        ObjectId medication_id FK
+        string medication_name
+        string kind
+        datetime scheduled_at
+        datetime confirmed_at
+        datetime asked_at
+        string question
+        string answer
+        string answer_note
+        datetime answered_at
+    }
+
     AUDIT_LOGS {
-        bigint id PK
-        bigint user_id FK
+        ObjectId _id PK
+        ObjectId user_id FK
         string entity
-        bigint entity_id
+        ObjectId entity_id
         string action
-        json details
-        datetime created_at
+        string details
+        datetime createdAt
     }
 ```
 
-## 3. Mô tả từng bảng
+## 3. Mô tả collection
 
-### 3.1 `users` — người dùng
+### 3.1 `users`
 
-| Trường | Kiểu | Ràng buộc | Mô tả |
-|---|---|---|---|
-| id | BIGINT UNSIGNED | PK, auto | |
-| firebase_uid | VARCHAR(128) | UNIQUE, not null | UID Firebase Auth |
-| phone | VARCHAR(20) | | SĐT trong hồ sơ, chuẩn hoá `0xxxxxxxxx`. **Đồng thời là định danh đăng nhập**: tài khoản tạo bằng SĐT có email Firebase là `<sđt>@med.local` (Spark plan không có Phone Auth OTP SMS) |
-| display_name | VARCHAR(100) | | Tên hiển thị |
-| address | VARCHAR(200) | | Địa chỉ liên hệ trong hồ sơ (M08) — không bắt buộc |
-| timezone | VARCHAR(50) | default 'Asia/Ho_Chi_Minh' | Múi giờ hiển thị |
-| preferences | JSON | | Cỡ chữ, âm thanh, nhắc lại (M08). Hiện dùng: `snoozeMinutes` (5–30, mặc định 10), `snoozeMax` (1–5, mặc định 3) — backend tuân theo khi snooze |
-| role | ENUM('user','manager','admin') | default 'user' | Vai trò hậu trường. `manager`/`admin` được gọi `/api/v1/admin`; chỉ `admin` đặt lại mật khẩu và đổi vai trò. Cấp/đổi bằng `/admin` (admin) hoặc script `npm run admin:grant` / `npm run role:set` (không có endpoint tự cấp) |
-| disabled_at | DATETIME | nullable, default null | `null` = đang hoạt động; có ngày = bị quản trị khóa. `authMiddleware` chặn mọi API bằng **403**; Firebase cũng đặt `disabled=true` để chặn đăng nhập lại |
-| created_at / updated_at | DATETIME | | UTC |
-
-> **Email không lưu trong MongoDB** (Firebase Auth giữ). Trang `/admin` lấy email của cả trang qua Firebase Admin `getUsers()` một lần; lỗi Firebase → `email = null`, không ảnh hưởng dữ liệu khác. Khóa/mở và đặt lại mật khẩu ghi `audit_logs` nhưng **không** ghi mật khẩu.
-
-### 3.2 `medications` — thuốc
-
-| Trường | Kiểu | Ràng buộc | Mô tả |
-|---|---|---|---|
-| id | BIGINT UNSIGNED | PK | |
-| user_id | BIGINT UNSIGNED | FK → users, index | Chủ hồ sơ |
-| name | VARCHAR(200) | not null | Tên thuốc do người dùng nhập |
-| image_url | VARCHAR(500) | nullable | Ảnh tùy chọn |
-| dosage_text | VARCHAR(200) | | Liều theo đơn — text người dùng nhập, không suy luận |
-| instructions | TEXT | | Hướng dẫn trước/sau ăn |
-| start_date | DATE | not null | Ngày bắt đầu |
-| end_date | DATE | nullable | Ngày kết thúc (null = không thời hạn) |
-| status | ENUM('active','discontinued') | default 'active' | Ngừng = discontinued, không xóa |
-| created_by / updated_by | BIGINT UNSIGNED | FK → users | Người tạo/sửa (có thể là người thân nếu có quyền) |
-
-### 3.3 `medication_schedules` — lịch uống
-
-| Trường | Kiểu | Ràng buộc | Mô tả |
-|---|---|---|---|
-| id | BIGINT UNSIGNED | PK | |
-| medication_id | BIGINT UNSIGNED | FK → medications, index | |
-| user_id | BIGINT UNSIGNED | FK → users, index | |
-| time_of_day | TIME | not null | Giờ uống trong ngày |
-| recurrence_rule | VARCHAR(100) | not null | Quy tắc lặp, MVP: 'daily' |
-| effective_from | DATE | not null | Ngày hiệu lực đầu |
-| effective_to | DATE | nullable | Ngày hiệu lực cuối |
-| status | ENUM('active','archived') | default 'active' | Lịch mới thay lịch cũ → archive bản cũ |
-| current_version | BIGINT | default 1 | Phiên bản hiện hành |
-
-Index: `(user_id, status, effective_from)`.
-
-### 3.4 `schedule_versions` — phiên bản lịch
-
-| Trường | Kiểu | Mô tả |
+| Trường | Kiểu | Ghi chú |
 |---|---|---|
-| id | BIGINT UNSIGNED | PK |
-| schedule_id | BIGINT UNSIGNED | FK → medication_schedules |
-| version | BIGINT | 1, 2, 3…; unique theo (schedule_id, version) |
-| snapshot | JSON | Toàn bộ nội dung lịch lúc phiên bản đó |
-| changed_by | BIGINT UNSIGNED | FK → users |
-| created_at | DATETIME | |
+| `_id` | ObjectId | Khóa chính |
+| `firebase_uid` | String | Unique; UID Firebase Auth |
+| `phone` | String? | SĐT hồ sơ, chuẩn hóa `0xxxxxxxxx` |
+| `display_name` | String? | Tên hiển thị |
+| `address` | String? | Địa chỉ liên hệ |
+| `timezone` | String | Mặc định `Asia/Ho_Chi_Minh` |
+| `preferences` | Mixed? | `snoozeMinutes` 5–30, `snoozeMax` 1–5; UI khác |
+| `role` | String | `user | manager | admin`, mặc định `user` |
+| `disabled_at` | Date? | Có giá trị = bị khóa; `authMiddleware` trả 403 |
+| `date_of_birth` | Date | Bắt buộc |
+| `email_verified_at` | Date? | Đồng bộ từ Firebase khi xác minh email |
+| `createdAt`, `updatedAt` | Date | Timestamps |
 
-Lịch sử lần uống ghi `schedule_version` để không bị ảnh hưởng khi đổi lịch.
+Email không lưu trong MongoDB; Firebase Auth giữ email. Khu vực admin lấy email qua Firebase Admin khi cần hiển thị.
 
-### 3.5 `dose_occurrences` — lần uống
+### 3.2 `medications`
 
-| Trường | Kiểu | Ràng buộc | Mô tả |
-|---|---|---|---|
-| id | BIGINT UNSIGNED | PK | |
-| schedule_id | BIGINT UNSIGNED | FK, index | |
-| medication_id | BIGINT UNSIGNED | FK, index | |
-| user_id | BIGINT UNSIGNED | FK, index | |
-| scheduled_at | DATETIME | **UNIQUE (schedule_id, scheduled_at)** | Giờ dự kiến — chống sinh trùng |
-| reminded_at | DATETIME | nullable | Giờ thực gửi nhắc |
-| status | ENUM('pending','confirmed','overdue','snoozed','missed','cannot_take') | default 'pending' | Trạng thái lần uống |
-| confirmed_at | DATETIME | nullable | Giờ xác nhận (server ghi) |
-| is_late_confirmation | BOOLEAN | default false | Xác nhận muộn trong cùng ngày |
-| cannot_take_reason | VARCHAR(500) | nullable | Bắt buộc khi status='cannot_take' |
-| snoozed_until | DATETIME | nullable | Hạn nhắc lại cuối |
-| snooze_count | INT | default 0 | Số lần đã nhắc lại |
-| schedule_version | BIGINT | not null | Phiên bản lịch lúc sinh |
-| created_at / updated_at | DATETIME | | |
-
-Index: `(user_id, scheduled_at)` cho M01/M03; `(user_id, status)` cho thống kê.
-
-### 3.6 `family_invites` — mã mời
-
-| Trường | Kiểu | Ràng buộc | Mô tả |
-|---|---|---|---|
-| id | BIGINT UNSIGNED | PK | |
-| owner_id | BIGINT UNSIGNED | FK → users | Người cao tuổi tạo mã |
-| code_hash | VARCHAR(64) | UNIQUE | Băm SHA-256 của mã 6 chữ số — không lưu mã thô |
-| expires_at | DATETIME | | Hạn dùng (mặc định 15 phút — chờ Q8) |
-| status | ENUM('pending','accepted','revoked','expired') | default 'pending' | |
-| created_at | DATETIME | | |
-
-### 3.7 `family_connections` — kết nối người thân
-
-| Trường | Kiểu | Ràng buộc | Mô tả |
-|---|---|---|---|
-| id | BIGINT UNSIGNED | PK | |
-| owner_id | BIGINT UNSIGNED | FK → users | Chủ hồ sơ |
-| relative_id | BIGINT UNSIGNED | FK → users | Người thân |
-| invite_id | BIGINT UNSIGNED | FK → family_invites | |
-| status | ENUM('active','revoked') | | Thu hồi = revoked, không xóa dòng |
-| permissions | JSON | | `{"view_schedule": true, "manage_medication": false, "relative_alerts": true}` — `relative_alerts` = người thân nhận push khi chủ hồ sơ bỏ lỡ thuốc (NOTIFICATION_PLAN §3.4) |
-| connected_at | DATETIME | | |
-| revoked_at | DATETIME | nullable | |
-
-UNIQUE: `(owner_id, relative_id)` khi status='active'.
-
-### 3.8 `devices` — trình duyệt/thiết bị và token FCM web
-
-| Trường | Kiểu | Ràng buộc | Mô tả |
-|---|---|---|---|
-| id | BIGINT UNSIGNED | PK | |
-| user_id | BIGINT UNSIGNED | FK, index | |
-| fcm_token | VARCHAR(512) | UNIQUE | Token Web Push (FCM for Web) |
-| platform | ENUM('web') | | Web Push; phân biệt thiết bị bằng user agent |
-| user_agent | VARCHAR(255) | nullable | Nhận diện trình duyệt/thiết bị (desktop, Android, iOS) |
-| notifications_enabled | BOOLEAN | default true | |
-| last_seen_at | DATETIME | | |
-| status | ENUM('active','invalid') | default 'active' | Token hết hạn → invalid |
-
-### 3.9 `notification_logs` — nhật ký thông báo
-
-| Trường | Kiểu | Mô tả |
+| Trường | Kiểu | Ghi chú |
 |---|---|---|
-| id | BIGINT UNSIGNED | PK |
-| dose_id | BIGINT UNSIGNED | FK → dose_occurrences |
-| device_id | BIGINT UNSIGNED | FK → devices, nullable |
-| channel | ENUM('fcm','in_app') | | FCM = Web Push; in_app = hiển thị trong trang khi trang đang mở |
-| kind | ENUM('scheduled_reminder','overdue','snooze','relative_alert','sync') | | `overdue` = nhắc khi quá giờ (NOTIFICATION_PLAN §3.3) |
-| sent_at | DATETIME | |
-| status | ENUM('sent','failed','expired') | |
-| error | VARCHAR(500) | nullable, không chứa token |
+| `_id` | ObjectId | Khóa chính |
+| `user_id` | ObjectId | Chủ hồ sơ |
+| `name` | String | Tối đa 200 ký tự |
+| `image_url` | String? | URL ảnh trong `/uploads` hoặc URL ngoài |
+| `dosage_text` | String? | Liều dùng |
+| `instructions` | String? | Hướng dẫn |
+| `start_date` | String | `YYYY-MM-DD` |
+| `end_date` | String? | `YYYY-MM-DD` |
+| `status` | String | `active | discontinued` |
+| `created_by`, `updated_by` | ObjectId | Người tạo/cập nhật |
+| `createdAt`, `updatedAt` | Date | Timestamps |
 
-Phân biệt “đã gửi thông báo” với “người dùng đã xác nhận uống”.
+### 3.3 `medicationschedules`
 
-### 3.10 `audit_logs` — nhật ký thay đổi
-
-| Trường | Kiểu | Mô tả |
+| Trường | Kiểu | Ghi chú |
 |---|---|---|
-| id | BIGINT UNSIGNED | PK |
-| user_id | BIGINT UNSIGNED | |
-| entity | VARCHAR(50) | 'medication','schedule','connection','invite',… |
-| entity_id | BIGINT UNSIGNED | |
-| action | VARCHAR(50) | 'create','update','disconnect','revoke',… |
-| details | JSON | Không chứa dữ liệu nhạy cảm |
-| created_at | DATETIME | |
+| `_id` | ObjectId | Khóa chính |
+| `medication_id` | ObjectId | Thuốc |
+| `user_id` | ObjectId | Chủ hồ sơ |
+| `time_of_day` | String | `HH:mm:ss` |
+| `recurrence_rule` | String | Mặc định `daily` |
+| `effective_from` | String | `YYYY-MM-DD` |
+| `effective_to` | String? | `YYYY-MM-DD` |
+| `status` | String | `active | archived` |
+| `current_version` | Number | Mặc định 1 |
+| `createdAt`, `updatedAt` | Date | Timestamps |
 
-## 4. Ràng buộc kiểm tra (validation)
+### 3.4 `scheduleversions`
 
-- `medications.name`: 1–200 ký tự; `start_date <= end_date` (nếu có).
-- `medication_schedules.time_of_day`: hợp lệ 00:00–23:59; `effective_from <= effective_to`.
-- `dose_occurrences.cannot_take_reason`: bắt buộc khi status = 'cannot_take'.
-- `family_invites.code_hash`: đúng định dạng SHA-256 hex.
-- Cập nhật `dose_occurrences` trạng thái: dùng atomic update (`findOneAndUpdate` + filter `status` hiện tại) theo bảng chuyển trạng thái ở BUSINESS_RULES.md.
-- Một lần uống chỉ một bản xác nhận: unique `(schedule_id, scheduled_at)` + atomic update khi confirm.
-
-## 5. Chính sách lưu giữ
-
-- Không tự động xóa lịch sử.
-- Xóa tài khoản: theo Q4 (đề xuất xóa cứng toàn bộ dữ liệu liên quan trong 30 ngày sau yêu cầu).
-- `audit_logs` giữ tối thiểu 1 năm.
-
-## 6. Kế hoạch migration
-
-| Migration | Nội dung | Giai đoạn |
+| Trường | Kiểu | Ghi chú |
 |---|---|---|
-| 001 | users, devices | 2 |
-| 002 | medications, medication_schedules, schedule_versions | 3 |
-| 003 | dose_occurrences | 3 |
-| 004 | family_invites, family_connections | 5 |
-| 005 | notification_logs, audit_logs | 3–5 |
-| 006 | `users.role` + `users.disabled_at` (thêm trường, bản ghi cũ mặc định `user`/`null`) | 8 (quản trị) |
+| `_id` | ObjectId | Khóa chính |
+| `schedule_id` | ObjectId | Lịch được version |
+| `version` | Number | Tăng dần |
+| `snapshot` | Mixed | Ảnh chụp lịch tại thời điểm đổi |
+| `changed_by` | ObjectId | Người đổi |
+| `createdAt` | Date | Chỉ có createdAt |
 
----
+### 3.5 `doseoccurrences`
 
-## Điểm cần duyệt
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `schedule_id` | ObjectId | Lịch sinh ra lần uống |
+| `medication_id` | ObjectId | Thuốc |
+| `user_id` | ObjectId | Chủ hồ sơ |
+| `scheduled_at` | Date | Giờ đến hạn (UTC) |
+| `reminded_at` | Date? | Lần nhắc gần nhất |
+| `status` | String | `pending | confirmed | overdue | snoozed | missed | cannot_take` |
+| `confirmed_at` | Date? | Thời điểm xác nhận |
+| `is_late_confirmation` | Boolean | Xác nhận sau giờ hẹn nhưng cùng ngày địa phương |
+| `cannot_take_reason` | String? | Lý do 1–500 ký tự |
+| `snoozed_until` | Date? | Mốc nhắc lại |
+| `snooze_count` | Number | Số lần đã nhắc lại |
+| `schedule_version` | Number | Phiên bản lịch tại lúc sinh |
+| `client_request_id` | String? | Chống gửi trùng khi confirm |
+| `createdAt`, `updatedAt` | Date | Timestamps |
 
-1. 7 nhóm bảng và các trường ở trên (không có bảng sức khỏe — theo phạm vi đã chốt).
-2. ENUM trạng thái lần uống: pending, confirmed, overdue, snoozed, missed, cannot_take.
-3. Chính sách lưu giữ ở mục 5 (phụ thuộc Q4).
-4. Mã mời lưu dạng băm SHA-256, không lưu mã thô.
-5. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: thêm `users.role` (`user`/`manager`/`admin`) + `users.disabled_at` cho khu vực vận hành; không thêm collection mới, không lưu email/mật khẩu trong MongoDB.
+### 3.6 `devices`
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `user_id` | ObjectId | Chủ thiết bị |
+| `fcm_token` | String | Unique; token Expo/FCM |
+| `platform` | String | `web | android | ios` |
+| `user_agent` | String? | Thông tin trình duyệt/thiết bị |
+| `notifications_enabled` | Boolean | Mặc định `true` |
+| `last_seen_at` | Date? | Lần đăng ký/cập nhật gần nhất |
+| `status` | String | `active | invalid` |
+| `createdAt`, `updatedAt` | Date | Timestamps |
+
+### 3.7 `familyinvites`
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `owner_id` | ObjectId | Chủ hồ sơ tạo mã |
+| `code_hash` | String | Unique; SHA-256 của mã 6 chữ số |
+| `expires_at` | Date | Hạn 15 phút |
+| `status` | String | `pending | accepted | revoked | expired` |
+| `createdAt` | Date | Chỉ có createdAt |
+
+### 3.8 `familyconnections`
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `owner_id` | ObjectId | Chủ hồ sơ |
+| `relative_id` | ObjectId | Người thân |
+| `invite_id` | ObjectId | Mã mời đã dùng |
+| `status` | String | `active | revoked` |
+| `permissions` | Object | `view_schedule`, `manage_medication`, `relative_alerts` |
+| `connected_at` | Date | Thời điểm kết nối |
+| `revoked_at` | Date? | Thời điểm ngắt kết nối |
+| `createdAt`, `updatedAt` | Date | Timestamps |
+
+Mặc định quyền: `view_schedule=true`, `manage_medication=false`, `relative_alerts=true`.
+
+### 3.9 `notificationlogs`
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `dose_id` | ObjectId | Lần uống liên quan |
+| `device_id` | ObjectId? | Thiết bị nhận |
+| `channel` | String | `fcm | in_app` |
+| `kind` | String | `scheduled_reminder | overdue | snooze | relative_alert | wellness_check | sync` |
+| `sent_at` | Date | Thời điểm gửi/thử gửi |
+| `status` | String | `sent | failed | expired` |
+| `error` | String? | Mã/lỗi gửi |
+
+### 3.10 `notificationhistories`
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `user_id` | ObjectId | Người nhận |
+| `event_key` | String | Khóa chống trùng theo người nhận |
+| `dose_id` | ObjectId? | Lần uống liên quan |
+| `kind` | String | Loại thông báo |
+| `title`, `body` | String | Nội dung đã gửi |
+| `data` | Mixed? | Payload deep link/action |
+| `status` | String | `sent | failed | expired` |
+| `error` | String? | Lỗi gửi |
+| `sent_at` | Date | Thời điểm gửi |
+
+### 3.11 `healthlogs`
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `user_id` | ObjectId | Chủ hồ sơ |
+| `dose_id` | ObjectId? | Lần uống được hỏi thăm |
+| `medication_id` | ObjectId? | Thuốc liên quan |
+| `medication_name` | String? | Tên thuốc tại thời điểm hỏi |
+| `kind` | String | `wellness_check | note` |
+| `scheduled_at`, `confirmed_at` | Date? | Mốc lần uống |
+| `asked_at` | Date | Thời điểm gửi câu hỏi |
+| `question` | String | Nội dung câu hỏi |
+| `answer` | String? | `good | tired | dizzy | unwell | other` |
+| `answer_note` | String? | Ghi chú thêm |
+| `answered_at` | Date? | Thời điểm trả lời |
+
+### 3.12 `auditlogs`
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `_id` | ObjectId | Khóa chính |
+| `user_id` | ObjectId | Người thực hiện |
+| `entity` | String | `dose`, `medication`, `schedule`, `invite`, `user`... |
+| `entity_id` | ObjectId | Đối tượng bị tác động |
+| `action` | String | `confirm`, `create`, `admin_lock`... |
+| `details` | Mixed? | Chi tiết không chứa mật khẩu/token |
+| `createdAt` | Date | Chỉ có createdAt |
+
+## 4. Index và ràng buộc chính
+
+| Collection | Index / ràng buộc | Mục đích |
+|---|---|---|
+| `users` | `firebase_uid` unique | Một tài khoản Firebase ↔ một hồ sơ |
+| `doseoccurrences` | `{ schedule_id, scheduled_at }` unique | Không sinh trùng lần uống |
+| `doseoccurrences` | `{ user_id, scheduled_at }`, `{ user_id, status }` | Truy vấn lịch và trạng thái |
+| `medicationschedules` | `{ user_id, status, effective_from }` | Lọc lịch đang hoạt động |
+| `scheduleversions` | `{ schedule_id, version }` unique | Một phiên bản chỉ có một bản ghi |
+| `devices` | `fcm_token` unique | Một token ↔ một thiết bị |
+| `familyinvites` | `code_hash` unique | Không trùng mã đã hash |
+| `familyconnections` | `{ owner_id, relative_id }` unique partial khi `status='active'` | Không kết nối trùng |
+| `notificationhistories` | `{ user_id, event_key }` unique | Chống gửi trùng cho cùng người nhận |
+| `healthlogs` | `{ dose_id }` unique partial khi có `dose_id` | Mỗi lần uống chỉ một mục hỏi thăm |
+
+## 5. Quy ước thời gian và vòng đời dữ liệu
+
+- `scheduled_at`, `confirmed_at`, `snoozed_until`, `asked_at`, `sent_at` lưu UTC.
+- Ngày nghiệp vụ (`start_date`, `effective_from`, `effective_to`) là chuỗi `YYYY-MM-DD` theo múi giờ chủ hồ sơ.
+- Lần uống quá 30 phút → `overdue`; quá 120 phút → `missed` (cron mỗi phút).
+- Xác nhận muộn trong cùng ngày địa phương đặt `is_late_confirmation=true`.
+- Hỏi thăm sức khỏe được tạo sau khi xác nhận 10 phút; mỗi lần uống chỉ có một `HealthLog`.
+- Ngắt kết nối người thân đặt `status='revoked'` và `revoked_at`; không xóa lịch sử.
+- Xóa tài khoản (admin) xóa dữ liệu liên quan trong MongoDB và Firebase user; thao tác được ghi audit.

@@ -7,9 +7,18 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.doduongw.medreminder",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
+      "package": "com.doduongw.medreminder",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -37,11 +46,21 @@
           "photosPermission": "Ứng dụng cần quyền truy cập ảnh để bạn chọn ảnh thuốc.",
           "cameraPermission": "Ứng dụng cần quyền camera để bạn chụp ảnh thuốc."
         }
+      ],
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "scheme": "medreminder",
     "extra": {
       "API_BASE_URL": "http://192.168.100.23:3000/api/v1",
+      "ALLOW_EMULATOR_PUSH": "true",
       "FIREBASE_API_KEY": "AIzaSyBlqzArvYUnI4IqRmL-1dtKjRaxYU6DARc",
       "FIREBASE_AUTH_DOMAIN": "medicationreminder-6177c.firebaseapp.com",
       "FIREBASE_PROJECT_ID": "medicationreminder-6177c",
@@ -49,7 +68,11 @@
       "FIREBASE_MESSAGING_SENDER_ID": "17863850068",
       "FIREBASE_APP_ID": "1:17863850068:web:01e9d0e5c32099da5195c1",
       "FIREBASE_MEASUREMENT_ID": "G-TMXSQTCNK3",
-      "FIREBASE_VAPID_KEY": ""
-    }
+      "FIREBASE_VAPID_KEY": "BG7dKj6Mje4XNEQrRfoovEjKEGuUMBE5XZnJKtgKHHGYxz2sCr06qMC1O3YeyKTbYQWIGMnxKehiRK31Uac2Pnc",
+      "eas": {
+        "projectId": "322a6d08-4d7a-4315-a88a-d37d0e2a05ba"
+      }
+    },
+    "owner": "doduongw"
   }
 }

@@ -6,7 +6,6 @@ export * from './Notice';
 export * from './Text';
 export * from './StateView';
 export * from './Segmented';
-export * from './DoseRow';
 export * from './ReasonDialog';
 export * from './RelativeUnconfirmedAlert';
 export * from './DueBanner';

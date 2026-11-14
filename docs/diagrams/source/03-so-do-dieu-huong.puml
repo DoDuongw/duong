@@ -1,0 +1,86 @@
+@startuml
+title Điều hướng màn hình — Expo Router (mobile/)
+left to right direction
+skinparam shadowing false
+
+rectangle "/\n(route gốc)" as Root
+rectangle "welcome\nđăng nhập / đăng ký" as Welcome
+rectangle "(tabs)\nbottom tabs" as Tabs
+
+rectangle "index\nTrang chủ" as Home
+rectangle "schedule\nLịch" as Schedule
+rectangle "medications\nThuốc" as Medications
+rectangle "notifications\nThông báo" as Notifications
+rectangle "operations\nVận hành / Quản trị" as Operations
+rectangle "profile\nHồ sơ" as Profile
+
+rectangle "dose/[id]\nChi tiết lần uống" as Dose
+rectangle "medication-new\nThêm thuốc" as MedicationNew
+rectangle "medication/[id]\nSửa thuốc / lịch" as MedicationDetail
+rectangle "family\nNgười thân" as Family
+rectangle "health-journal\nNhật ký sức khỏe" as HealthJournal
+rectangle "settings\nCài đặt" as Settings
+rectangle "personal-info\nThông tin cá nhân" as PersonalInfo
+rectangle "admin/index\nDashboard vận hành" as Admin
+
+Root --> Welcome : chưa đăng nhập
+Root --> Tabs : đã đăng nhập
+Welcome --> Tabs : đăng nhập / đăng ký thành công
+
+Tabs --> Home
+Tabs --> Schedule
+Tabs --> Medications
+Tabs --> Notifications
+Tabs --> Profile
+Tabs --> Operations : role manager / admin
+
+Home --> Dose : chọn lần uống
+Home --> Schedule : xem lịch
+Home --> Family : người thân
+
+Schedule --> Dose : chọn lần uống
+Schedule --> MedicationNew : thêm thuốc
+Schedule --> Family : người thân
+
+Medications --> MedicationNew : thêm thuốc
+Medications --> MedicationDetail : sửa thuốc
+Medications --> Family : người thân
+
+Notifications --> Dose : thông báo lần uống
+Notifications --> HealthJournal : thông báo sức khỏe
+Notifications --> Settings : bật thông báo
+
+Profile --> PersonalInfo
+Profile --> HealthJournal
+Profile --> Settings
+Profile --> Welcome : đăng xuất
+
+Settings --> Family
+
+Family --> Schedule : xem lịch hộ (?ownerId=)
+Family --> Dose : mở cảnh báo
+Family --> Notifications : xem tất cả thông báo
+
+Operations --> Admin : re-export admin/index
+Admin --> Home : về trang chủ
+
+MedicationNew --> Medications : lưu thành công
+MedicationDetail --> Medications : lưu thành công
+Dose --> Schedule : quay lại
+Dose --> Home : quay lại
+
+note right of Dose
+  Push nhắc thuốc / quá giờ mở
+  /dose/:id?action=confirm|snooze|cannot
+end note
+
+note right of HealthJournal
+  Push hỏi thăm mở
+  /health-journal?logId=...&answer=...
+end note
+
+note bottom of Operations
+  Tab chỉ hiện với role manager/admin.
+  Người dùng thường không thấy tab này.
+end note
+@enduml

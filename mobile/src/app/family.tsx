@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   Switch,
   Platform,
   Image,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -18,14 +19,16 @@ import {
   acceptFamilyInvite,
   createFamilyInvite,
   getDosesByDate,
+  getFamilyAlerts,
   listFamilyConnections,
   revokeFamilyConnection,
   updateFamilyPermissions,
 } from '../services/endpoints';
-import type { DayDoses, DoseWithMedication, FamilyConnectionItem, FamilyPermissions } from '../types';
+import type { DayDoses, DoseWithMedication, FamilyAlertItem, FamilyConnectionItem } from '../types';
 import {
   BUOI_LABEL,
   buoiOfIso,
+  formatDate,
   formatDisplayDate,
   formatTime,
   formatTimezoneLabel,
@@ -41,6 +44,8 @@ const BUOI_ICON: Record<Buoi, string> = { sang: '🌅', trua: '☀️', chieu: '
 export default function FamilyScreen() {
   const [tab, setTab] = useState<'list' | 'join'>('list');
   const [connections, setConnections] = useState<FamilyConnectionItem[]>([]);
+  const [alerts, setAlerts] = useState<FamilyAlertItem[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +70,17 @@ export default function FamilyScreen() {
       setError(null);
       const data = await listFamilyConnections();
       setConnections(Array.isArray(data) ? data : []);
+      try {
+        const alertData = await getFamilyAlerts();
+        setAlerts(Array.isArray(alertData) ? alertData : []);
+      } catch {
+        setAlerts([]);
+      }
     } catch (e: any) {
       setError(e?.message || 'Không thể tải kết nối');
     } finally {
       setLoading(false);
+      setAlertsLoading(false);
       setRefreshing(false);
     }
   }, []);
@@ -254,6 +266,10 @@ export default function FamilyScreen() {
                   </Card>
                 ) : null}
 
+                {relatives.length > 0 ? (
+                  <FamilyAlertsCard alerts={alerts} loading={alertsLoading} />
+                ) : null}
+
                 {relatives.map((conn) => (
                   <RelativeSchedule
                     key={conn.id}
@@ -334,6 +350,59 @@ export default function FamilyScreen() {
   );
 }
 
+function FamilyAlertsCard({ alerts, loading }: { alerts: FamilyAlertItem[]; loading: boolean }) {
+  return (
+    <Section title="Cảnh báo bỏ lỡ thuốc" icon="🔔">
+      <Text style={styles.muted}>
+        Các cảnh báo này được lưu lại để bạn luôn thấy, kể cả khi điện thoại không nhận được push.
+      </Text>
+      {loading ? (
+        <StateView state="loading" />
+      ) : alerts.length === 0 ? (
+        <Text style={styles.muted}>Chưa có cảnh báo bỏ lỡ thuốc nào.</Text>
+      ) : (
+        alerts.slice(0, 8).map((alert) => {
+          const statusLabel = DOSE_STATUS_LABEL[alert.status as keyof typeof DOSE_STATUS_LABEL] || alert.status;
+          return (
+            <Pressable
+              key={alert.id}
+              onPress={() => router.push(`/dose/${alert.doseId}` as any)}
+              style={styles.alertRow}
+              accessibilityRole="button"
+              accessibilityLabel={`Cảnh báo ${alert.medicationName} của ${alert.ownerName}`}
+            >
+              <View style={styles.alertIcon}>
+                <Text style={styles.alertIconText}>!</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.alertTitle}>
+                  {alert.ownerName} · {alert.medicationName}
+                </Text>
+                <Text style={styles.alertMeta}>
+                  {formatDate(alert.scheduledAt, alert.ownerTimezone)} lúc{' '}
+                  {formatTime(alert.scheduledAt, alert.ownerTimezone)} · {statusLabel}
+                </Text>
+                {alert.cannotTakeReason ? (
+                  <Text style={styles.alertMeta}>Lý do: {alert.cannotTakeReason}</Text>
+                ) : null}
+                {alert.deliveryStatus !== 'sent' ? (
+                  <Text style={styles.alertError}>Push chưa gửi được — cảnh báo vẫn được lưu tại đây.</Text>
+                ) : null}
+              </View>
+              <Text style={styles.alertArrow}>›</Text>
+            </Pressable>
+          );
+        })
+      )}
+      {alerts.length > 8 ? (
+        <Button variant="ghost" size="md" onPress={() => router.push('/notifications' as any)} style={{ marginTop: spacing.sm }}>
+          Xem tất cả trong Thông báo
+        </Button>
+      ) : null}
+    </Section>
+  );
+}
+
 function PermissionRow({
   label,
   hint,
@@ -408,9 +477,11 @@ function RelativeSchedule({
     }
   }, [date, conn.user.id, canView]);
 
-  useEffect(() => {
-    loadDoses();
-  }, [loadDoses]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadDoses();
+    }, [loadDoses]),
+  );
 
   const grouped: Record<Buoi, DoseWithMedication[]> = { sang: [], trua: [], chieu: [], toi: [] };
   for (const dose of doses) grouped[buoiOfIso(dose.scheduledAt, timezone)].push(dose);
@@ -533,4 +604,25 @@ const styles = StyleSheet.create({
   doseThumb: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.surface2 },
   doseName: { ...typography.body, fontWeight: '700', color: colors.text },
   doseMeta: { ...typography.bodySm, color: colors.muted },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  alertIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.dangerSoft,
+  },
+  alertIconText: { color: colors.danger, fontWeight: '900', fontSize: 18 },
+  alertTitle: { ...typography.bodySm, fontWeight: '800', color: colors.text },
+  alertMeta: { ...typography.caption, color: colors.muted, marginTop: 2 },
+  alertError: { ...typography.caption, color: colors.danger, marginTop: 2, fontWeight: '700' },
+  alertArrow: { fontSize: 26, color: colors.muted, paddingHorizontal: 4 },
 });

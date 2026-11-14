@@ -1,0 +1,52 @@
+@startuml
+title Express routes extracted from backend/src/routes
+left to right direction
+skinparam shadowing false
+rectangle "Backend Express API" {
+  usecase "GET /api/v1/admin/audit-logs" as R1
+  usecase "GET /api/v1/admin/notifications" as R2
+  usecase "GET /api/v1/admin/summary" as R3
+  usecase "GET /api/v1/admin/users" as R4
+  usecase "DELETE /api/v1/admin/users/:id" as R5
+  usecase "POST /api/v1/admin/users/:id/reset-password" as R6
+  usecase "PATCH /api/v1/admin/users/:id/role" as R7
+  usecase "PATCH /api/v1/admin/users/:id/status" as R8
+  usecase "GET /api/v1/doses" as R9
+  usecase "GET /api/v1/doses/:id" as R10
+  usecase "POST /api/v1/doses/:id/cannot-take" as R11
+  usecase "POST /api/v1/doses/:id/confirm" as R12
+  usecase "POST /api/v1/doses/:id/snooze" as R13
+  usecase "GET /api/v1/doses/range" as R14
+  usecase "GET /api/v1/doses/today" as R15
+  usecase "GET /api/v1/family/alerts" as R16
+  usecase "GET /api/v1/family/connections" as R17
+  usecase "DELETE /api/v1/family/connections/:id" as R18
+  usecase "PATCH /api/v1/family/connections/:id/permissions" as R19
+  usecase "POST /api/v1/family/invites" as R20
+  usecase "POST /api/v1/family/invites/:code/accept" as R21
+  usecase "GET /api/v1/health-logs" as R22
+  usecase "PATCH /api/v1/health-logs/:id" as R23
+  usecase "GET /api/v1/history" as R24
+  usecase "GET /api/v1/medications" as R25
+  usecase "POST /api/v1/medications" as R26
+  usecase "GET /api/v1/medications/:id" as R27
+  usecase "PATCH /api/v1/medications/:id" as R28
+  usecase "POST /api/v1/medications/:id/discontinue" as R29
+  usecase "POST /api/v1/medications/:id/schedules" as R30
+  usecase "DELETE /api/v1/medications/schedules/:id" as R31
+  usecase "PUT /api/v1/medications/schedules/:id" as R32
+  usecase "GET /api/v1/notifications" as R33
+  usecase "POST /api/v1/uploads/medication-image" as R34
+  usecase "POST /api/v1/users/devices/register" as R35
+  usecase "DELETE /api/v1/users/devices/unregister" as R36
+  usecase "GET /api/v1/users/me" as R37
+  usecase "PATCH /api/v1/users/me" as R38
+  usecase "PATCH /api/v1/users/me/notification-settings" as R39
+  usecase "POST /api/v1/users/me/sync" as R40
+}
+note bottom
+Generated from static router.method("/path") declarations.
+Mount prefixes are read from backend/src/app.ts; /health is served outside /api/v1.
+Detected routes: 40 (40 mounted under /api/v1)
+end note
+@enduml

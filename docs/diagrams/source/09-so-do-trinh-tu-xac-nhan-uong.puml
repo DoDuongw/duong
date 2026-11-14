@@ -1,0 +1,41 @@
+@startuml
+title Trình tự xác nhận đã uống thuốc
+autonumber
+actor "Chủ hồ sơ" as User
+participant "Trang chủ / Lịch /\ndose/[id]" as App
+participant "Express API" as API
+participant "authMiddleware" as Auth
+participant "doseService" as Dose
+database "MongoDB" as DB
+
+User -> App : bấm "Đã uống"
+App -> App : tạo clientRequestId (8–64 ký tự)
+App -> API : POST /api/v1/doses/{id}/confirm\n{ clientRequestId }
+API -> Auth : verifyIdToken + lấy userId
+Auth --> API : userId
+API -> Dose : confirmDose(doseId, userId, clientRequestId, timezone)
+Dose -> DB : findOneAndUpdate\n{_id, user_id, status in [pending,snoozed,overdue]}\nset status=confirmed, confirmed_at, client_request_id
+alt cập nhật thành công
+  DB --> Dose : dose đã confirmed
+  Dose -> Dose : isLate = now > scheduled_at\nvà cùng ngày địa phương
+  Dose -> DB : lưu is_late_confirmation nếu muộn
+  Dose -> DB : ghi AuditLog action=confirm
+  Dose --> API : dose
+  API --> App : JSON dose confirmed
+  App --> User : cập nhật trạng thái + tiến độ hôm nay
+else cùng clientRequestId đã xử lý
+  Dose -> DB : đọc dose hiện tại
+  DB --> Dose : confirmed + cùng client_request_id
+  Dose --> API : trả kết quả idempotent
+  API --> App : JSON dose confirmed
+else trạng thái không cho phép / không phải chủ hồ sơ
+  Dose --> API : 403 / 404 / 409
+  API --> App : lỗi
+  App --> User : hiển thị thông báo
+end
+
+note over API,DB
+  Không có endpoint sửa/xóa confirmed_at hoặc trạng thái kết thúc.
+  Sau 10 phút, cron gửi push hỏi thăm sức khỏe cho lần uống này.
+end note
+@enduml

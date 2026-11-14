@@ -1,0 +1,214 @@
+@startuml
+title Mô hình dữ liệu — 12 collection MongoDB
+hide methods
+hide stereotypes
+skinparam linetype ortho
+skinparam shadowing false
+
+entity "users" as users {
+  * _id : ObjectId PK
+  --
+  firebase_uid : string UK
+  phone : string
+  display_name : string
+  address : string
+  timezone : string
+  preferences : Mixed
+  role : user | manager | admin
+  disabled_at : Date
+  date_of_birth : Date
+  email_verified_at : Date
+}
+
+entity "medications" as meds {
+  * _id : ObjectId PK
+  --
+  user_id : ObjectId FK
+  name : string
+  image_url : string
+  dosage_text : string
+  instructions : string
+  start_date : string (YYYY-MM-DD)
+  end_date : string (YYYY-MM-DD)
+  status : active | discontinued
+  created_by : ObjectId FK
+  updated_by : ObjectId FK
+}
+
+entity "medicationschedules" as schedules {
+  * _id : ObjectId PK
+  --
+  medication_id : ObjectId FK
+  user_id : ObjectId FK
+  time_of_day : string HH:mm:ss
+  recurrence_rule : string
+  effective_from : string (YYYY-MM-DD)
+  effective_to : string (YYYY-MM-DD)
+  status : active | archived
+  current_version : number
+}
+
+entity "scheduleversions" as versions {
+  * _id : ObjectId PK
+  --
+  schedule_id : ObjectId FK
+  version : number
+  snapshot : Mixed
+  changed_by : ObjectId FK
+  createdAt : Date
+}
+
+entity "doseoccurrences" as doses {
+  * _id : ObjectId PK
+  --
+  schedule_id : ObjectId FK
+  medication_id : ObjectId FK
+  user_id : ObjectId FK
+  scheduled_at : Date
+  reminded_at : Date
+  status : pending | confirmed | overdue | snoozed | missed | cannot_take
+  confirmed_at : Date
+  is_late_confirmation : boolean
+  cannot_take_reason : string
+  snoozed_until : Date
+  snooze_count : number
+  schedule_version : number
+  client_request_id : string
+}
+
+entity "devices" as devices {
+  * _id : ObjectId PK
+  --
+  user_id : ObjectId FK
+  fcm_token : string UK
+  platform : web | android | ios
+  user_agent : string
+  notifications_enabled : boolean
+  last_seen_at : Date
+  status : active | invalid
+}
+
+entity "familyinvites" as invites {
+  * _id : ObjectId PK
+  --
+  owner_id : ObjectId FK
+  code_hash : string UK (SHA-256)
+  expires_at : Date
+  status : pending | accepted | revoked | expired
+  createdAt : Date
+}
+
+entity "familyconnections" as connections {
+  * _id : ObjectId PK
+  --
+  owner_id : ObjectId FK
+  relative_id : ObjectId FK
+  invite_id : ObjectId FK
+  status : active | revoked
+  permissions : view_schedule / manage_medication / relative_alerts
+  connected_at : Date
+  revoked_at : Date
+}
+
+entity "notificationlogs" as nlogs {
+  * _id : ObjectId PK
+  --
+  dose_id : ObjectId FK
+  device_id : ObjectId FK
+  channel : fcm | in_app
+  kind : scheduled_reminder | overdue | snooze | relative_alert | wellness_check | sync
+  sent_at : Date
+  status : sent | failed | expired
+  error : string
+}
+
+entity "notificationhistories" as nhistories {
+  * _id : ObjectId PK
+  --
+  user_id : ObjectId FK
+  event_key : string
+  dose_id : ObjectId FK
+  kind : string
+  title : string
+  body : string
+  data : Mixed
+  status : sent | failed | expired
+  error : string
+  sent_at : Date
+}
+
+entity "healthlogs" as healthlogs {
+  * _id : ObjectId PK
+  --
+  user_id : ObjectId FK
+  dose_id : ObjectId FK
+  medication_id : ObjectId FK
+  medication_name : string
+  kind : wellness_check | note
+  scheduled_at : Date
+  confirmed_at : Date
+  asked_at : Date
+  question : string
+  answer : good | tired | dizzy | unwell | other
+  answer_note : string
+  answered_at : Date
+}
+
+entity "auditlogs" as audits {
+  * _id : ObjectId PK
+  --
+  user_id : ObjectId FK
+  entity : string
+  entity_id : ObjectId
+  action : string
+  details : Mixed
+  createdAt : Date
+}
+
+users ||--o{ meds : owns
+users ||--o{ schedules : owns
+meds ||--o{ schedules : has
+schedules ||--o{ versions : versioned_by
+schedules ||--o{ doses : generates
+meds ||--o{ doses : describes
+users ||--o{ doses : owns
+users ||--o{ devices : registers
+users ||--o{ invites : creates
+users ||--o{ connections : owner
+users ||--o{ connections : relative
+invites ||--o| connections : accepted_into
+doses ||--o{ nlogs : notified_by
+devices ||--o{ nlogs : receives
+users ||--o{ nhistories : receives
+doses ||--o{ nhistories : references
+users ||--o{ healthlogs : answers
+doses ||--o| healthlogs : asks_after
+meds ||--o{ healthlogs : references
+users ||--o{ audits : actor
+
+note bottom of doses
+  Unique index (schedule_id, scheduled_at).
+  Index (user_id, scheduled_at) và (user_id, status).
+  Chuyển trạng thái bằng findOneAndUpdate có điều kiện status.
+end note
+
+note bottom of connections
+  Unique partial index (owner_id, relative_id)
+  khi status = 'active'.
+end note
+
+note bottom of nhistories
+  Unique index (user_id, event_key) để chống ghi trùng
+  khi cron/retry lặp lại cùng một sự kiện.
+end note
+
+note bottom of healthlogs
+  Unique partial index trên dose_id:
+  mỗi lần uống chỉ có một mục hỏi thăm sức khỏe.
+end note
+
+note bottom
+  Lưu trữ MongoDB với ObjectId; thời gian lưu UTC.
+  Quan hệ thể hiện bằng khóa ngoại logic, không dùng khóa tự tăng.
+end note
+@enduml

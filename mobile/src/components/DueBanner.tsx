@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { Text } from './Text';
 import { router } from 'expo-router';
@@ -6,7 +6,7 @@ import { useDueReminder } from '../hooks/useDueReminder';
 import { confirmDose, newClientRequestId } from '../services/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { formatTime } from '../utils/dateTime';
-import { colors, spacing, typography, radius } from '../theme';
+import { spacing, typography } from '../theme';
 import { Button } from './Button';
 
 import * as Speech from 'expo-speech';

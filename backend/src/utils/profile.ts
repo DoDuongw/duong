@@ -27,16 +27,6 @@ export function normalizePhone(input: string): string | null {
   return local;
 }
 
-export function isValidPhone(input: string): boolean {
-  return normalizePhone(input) !== null;
-}
-
-/** Địa chỉ: 1–200 ký tự sau khi cắt khoảng trắng thừa */
-export function isValidAddress(input: string): boolean {
-  const trimmed = input.trim();
-  return trimmed.length >= 1 && trimmed.length <= ADDRESS_MAX_LENGTH;
-}
-
 /** Email nội bộ dựng từ SĐT (Firebase Auth không có Phone Auth trên Spark plan) */
 export function phoneToInternalEmail(phone: string): string {
   return `${phone}@med.local`;

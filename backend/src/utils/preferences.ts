@@ -3,7 +3,7 @@
  * Giá trị mặc định khớp BUSINESS_RULES: nhắc lại 10 phút, tối đa 3 lần.
  */
 
-export const SNOOZE_MINUTES_DEFAULT = 10;
+const SNOOZE_MINUTES_DEFAULT = 10;
 export const SNOOZE_MAX_DEFAULT = 3;
 
 /** Giới hạn cho phép chỉnh ở M08 (đủ rộng nhưng không phá luồng nghiệp vụ) */

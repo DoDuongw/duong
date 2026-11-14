@@ -1,7 +1,3 @@
-export function nowUtc(): Date {
-  return new Date();
-}
-
 export function todayLocal(tz: string): string {
   return localYmd(new Date(), tz);
 }

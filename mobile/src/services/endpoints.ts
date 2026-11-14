@@ -1,4 +1,7 @@
+import { Platform } from "react-native";
 import { apiFetch } from "./api";
+import { API_BASE } from "../config";
+import { getIdToken } from "./firebase";
 import type {
   AdminAuditItem,
   AdminFailedNotification,
@@ -6,8 +9,10 @@ import type {
   AdminUserPage,
   DayDoses,
   Dose,
+  DoseRange,
   DoseWithMedication,
   FamilyConnectionItem,
+  FamilyAlertItem,
   FamilyInviteCreated,
   FamilyPermissions,
   HistoryPage,
@@ -136,6 +141,10 @@ export function getDosesByDate(date: string, ownerId?: string): Promise<DayDoses
   return apiFetch<DayDoses>(`/doses${query({ date, ownerId })}`);
 }
 
+export function getDoseRange(from: string, to: string, ownerId?: string): Promise<DoseRange> {
+  return apiFetch<DoseRange>(`/doses/range${query({ from, to, ownerId })}`);
+}
+
 export function getDose(id: string): Promise<DoseWithMedication> {
   return apiFetch<DoseWithMedication>(`/doses/${id}`);
 }
@@ -162,6 +171,39 @@ export function registerDevice(input: {
 
 export function unregisterDevice(fcmToken: string): Promise<{ removed: boolean }> {
   return apiFetch("/users/devices/unregister", { method: "DELETE", body: { fcmToken } });
+}
+
+/**
+ * Tải ảnh thuốc lên backend (lưu cục bộ), trả về URL công khai.
+ * Không dùng Firebase Storage để tránh lỗi bucket/rules trên môi trường dev.
+ */
+export async function uploadMedicationImage(localUri: string): Promise<string> {
+  const form = new FormData();
+  if (Platform.OS === "web") {
+    const response = await fetch(localUri);
+    if (!response.ok) throw new Error("Không đọc được file ảnh để tải lên.");
+    const blob = await response.blob();
+    const ext = (blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
+    form.append("file", blob, `medication.${ext}`);
+  } else {
+    const name = localUri.split("/").pop()?.split("?")[0] || `medication-${Date.now()}.jpg`;
+    const ext = (name.split(".").pop() || "jpg").toLowerCase();
+    const mime =
+      ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/jpeg";
+    form.append("file", { uri: localUri, name, type: mime } as any);
+  }
+
+  const token = await getIdToken();
+  const response = await fetch(`${API_BASE}/uploads/medication-image`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  const json = (await response.json().catch(() => null)) as any;
+  if (!response.ok || !json?.success) {
+    throw new Error(json?.error?.message || "Không tải ảnh lên được. Vui lòng thử lại.");
+  }
+  return String(json.data.url);
 }
 
 export interface HistoryQuery {
@@ -216,6 +258,11 @@ export function acceptFamilyInvite(
 
 export function listFamilyConnections(): Promise<FamilyConnectionItem[]> {
   return apiFetch<FamilyConnectionItem[]>("/family/connections");
+}
+
+/** Cảnh báo bỏ lỡ thuốc mà người thân đã nhận (kể cả khi push thất bại). */
+export function getFamilyAlerts(): Promise<FamilyAlertItem[]> {
+  return apiFetch<FamilyAlertItem[]>("/family/alerts");
 }
 
 export function updateFamilyPermissions(

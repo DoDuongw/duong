@@ -1,0 +1,70 @@
+@startuml
+title Kiến trúc tổng thể MedReminder
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+package "mobile/ — Expo 58 + React Native 0.88 + Expo Router" {
+  [Màn hình Expo Router] as Screens
+  [AuthProvider + hooks] as State
+  [API client / axios] as Client
+  [expo-notifications\nAndroid / iOS] as NativePush
+  [Firebase JS SDK\nExpo Web] as WebPush
+  [public/sw.js\nService Worker] as SW
+
+  Screens --> State
+  Screens --> Client
+  State --> Client
+  State --> NativePush
+  State --> WebPush
+  WebPush --> SW
+}
+
+package "backend/ — Node.js + Express + TypeScript" {
+  [REST API /api/v1] as API
+  [authMiddleware] as AuthMW
+  [Routes] as Routes
+  [familyAccess] as FamilyMW
+  [Services\nthuốc · lần uống · thông báo · quản trị] as Services
+  [node-cron scheduler] as Cron
+  [Firebase Admin SDK] as AdminSDK
+  [Ảnh thuốc cục bộ\n/uploads] as Uploads
+
+  API --> AuthMW
+  AuthMW --> Routes
+  Routes --> FamilyMW
+  FamilyMW --> Services
+  Cron --> Services
+  Services --> AdminSDK
+  Routes --> Uploads
+}
+
+database "MongoDB\nMongoose + ObjectId" as DB
+cloud "Firebase Authentication" as FirebaseAuth
+cloud "FCM / Expo Push" as Push
+
+Client --> API : HTTPS JSON + Bearer ID token
+State --> FirebaseAuth : đăng nhập / ID token
+AuthMW --> AdminSDK : verifyIdToken
+AdminSDK --> FirebaseAuth
+Services --> DB
+AdminSDK --> Push : gửi push
+Push --> NativePush
+Push --> SW
+
+note right of Cron
+  Mỗi phút: chuyển overdue/missed và gửi push.
+  Mỗi ngày 00:00: sinh lần uống cho 7 ngày tới.
+  Chỉ chạy khi ENABLE_CRON=true.
+end note
+
+note bottom of Screens
+  Ứng dụng chính là mobile/.
+  Expo Web dùng chung mã nguồn, chạy tại http://localhost:8081.
+  Push native dùng expo-notifications; Expo Web dùng Firebase JS SDK + Service Worker.
+end note
+
+note bottom of Uploads
+  Ảnh thuốc lưu trên đĩa backend, không dùng Firebase Storage.
+end note
+@enduml

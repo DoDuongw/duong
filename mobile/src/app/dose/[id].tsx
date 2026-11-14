@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, StateView, ReasonDialog, Text } from '../../components';
-import { colors, spacing, typography, radius } from '../../theme';
+import { colors, spacing, typography } from '../../theme';
 import { cannotTakeDose, confirmDose, getDose, newClientRequestId, snoozeDose } from '../../services/endpoints';
 import { useAuth } from '../../hooks/useAuth';
 import type { Dose, DoseWithMedication } from '../../types';

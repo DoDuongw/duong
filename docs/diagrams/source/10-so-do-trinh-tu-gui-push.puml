@@ -1,0 +1,56 @@
+@startuml
+title Trình tự gửi push nhắc uống thuốc
+autonumber
+participant "node-cron\n(mỗi phút)" as Cron
+participant "doseService" as Dose
+participant "notificationService" as Notify
+database "MongoDB" as DB
+participant "Expo Push / FCM" as Push
+participant "expo-notifications\n(Android/iOS)" as Native
+participant "Service Worker\n(Expo Web)" as SW
+actor "Người dùng" as User
+
+Cron -> Dose : transitionOverdueAndMissed()
+Dose -> DB : pending quá 30 phút -> overdue\npending/snoozed/overdue quá 120 phút -> missed
+
+Cron -> Notify : processDueNotifications()
+Notify -> DB : tìm lần uống đến hạn\npending / snoozed / overdue trong cửa sổ 30 phút
+DB --> Notify : danh sách dose + thuốc + chủ hồ sơ
+
+loop từng lần uống
+  Notify -> Notify : chọn payload\nscheduled_reminder / snooze / overdue
+  Notify -> DB : tìm Device active +\nnotifications_enabled=true
+  DB --> Notify : danh sách token
+  alt chưa có thiết bị
+    Notify -> DB : ghi NotificationLog failed\n(no_active_device)
+  else có token
+    loop tối đa 3 lần (backoff 1s / 5s / 15s)
+      Notify -> Push : gửi title/body/data
+      Push --> Notify : kết quả từng token
+    end
+    Notify -> DB : token invalid -> Device.status=invalid
+    Notify -> DB : ghi NotificationLog\nvà NotificationHistory theo người nhận
+    Push --> Native : notification
+    Push --> SW : push event
+    Native --> User : banner + nút thao tác nhanh
+    SW --> User : notification + deep link
+  end
+end
+
+User -> Native : bấm "Đã uống" / "Nhắc lại" / "Không thể uống"
+Native -> User : mở /dose/:id?action=...
+User -> SW : bấm notification
+SW -> User : mở /dose/:id
+
+note over Notify,DB
+  Nếu chưa có thiết bị, cron còn thử lại trong cửa sổ 30 phút
+  khi người dùng đăng ký thiết bị muộn.
+end note
+
+note over Cron,Notify
+  Mỗi người nhận có trạng thái gửi riêng trong NotificationHistory;
+  event_key chống ghi trùng khi cron/retry lặp lại.
+  NotificationLog ghi từng lần thử/gửi để chẩn đoán.
+  Cảnh báo người thân và hỏi thăm sức khỏe có sequence riêng.
+end note
+@enduml

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, typography } from "../theme";
@@ -20,7 +20,7 @@ export function TimezoneField({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const options = useMemo(() => timezoneOptions(value), [value, open]);
+  const options = useMemo(() => timezoneOptions(value), [value]);
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return options.slice(0, 200);

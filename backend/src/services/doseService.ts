@@ -1,30 +1,20 @@
 import { Types } from 'mongoose';
-import { DoseOccurrence, DoseStatus, DoseOccurrenceDoc } from '../models/DoseOccurrence';
-import { MedicationSchedule, ScheduleDoc } from '../models/MedicationSchedule';
-import { Medication, MedicationDoc } from '../models/Medication';
+import { DoseOccurrence, DoseStatus } from '../models/DoseOccurrence';
+import { MedicationSchedule } from '../models/MedicationSchedule';
+import { MedicationDoc } from '../models/Medication';
 import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors';
 import { addMinutes, isSameLocalDay, isSameLocalDayAs, localDateTimeToUtc } from '../utils/time';
 import { env } from '../config/env';
-import { SNOOZE_MAX_DEFAULT, SNOOZE_MINUTES_DEFAULT, readSnoozeSettings } from '../utils/preferences';
+import { SNOOZE_MAX_DEFAULT, readSnoozeSettings } from '../utils/preferences';
 
 export const OVERDUE_AFTER_MINUTES = 30;
-/** Giá trị mặc định (người dùng có thể chỉnh ở M08 — xem utils/preferences) */
-export const SNOOZE_MINUTES = SNOOZE_MINUTES_DEFAULT;
 export const SNOOZE_MAX = SNOOZE_MAX_DEFAULT;
 export const MISSED_AFTER_MINUTES = 120;
 
 const CONFIRMABLE: DoseStatus[] = ['pending', 'snoozed', 'overdue'];
 const SNOOZABLE: DoseStatus[] = ['pending', 'snoozed', 'overdue'];
-
-export async function assertDoseOwner(doseId: string, userId: string) {
-  if (!Types.ObjectId.isValid(doseId) || !Types.ObjectId.isValid(userId)) throw notFound('Không tìm thấy lần uống');
-  const dose = await DoseOccurrence.findById(doseId);
-  if (!dose) throw notFound('Không tìm thấy lần uống');
-  if (dose.user_id.toString() !== userId) throw forbidden();
-  return dose;
-}
 
 export async function confirmDose(
   doseId: string,
@@ -178,12 +168,14 @@ export async function generateUpcomingDoses(
   days: number,
   tz: string,
   onlyScheduleId?: string,
+  onlyUserId?: string,
 ): Promise<GenerateDosesResult> {
   const now = new Date();
   const end = addMinutes(now, days * 24 * 60);
 
   const filter: Record<string, unknown> = { status: 'active' };
   if (onlyScheduleId) filter._id = onlyScheduleId;
+  if (onlyUserId) filter.user_id = onlyUserId;
   const schedules = await MedicationSchedule.find(filter).populate('medication_id');
 
   let created = 0;

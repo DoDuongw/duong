@@ -2,18 +2,17 @@ import { useCallback, useState } from "react";
 import { View, StyleSheet, ScrollView, Alert, RefreshControl, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
-import { Card, Button, Section, Notice, Text } from "../../components";
+import { Button, Section, Notice, Text } from "../../components";
 import { colors, spacing, typography, radius } from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
 import { confirmDose, getTodayDoses, newClientRequestId } from "../../services/endpoints";
 import type { DoseWithMedication, TodayDoses } from "../../types";
-import { buoiOfIso, formatTime, todayYmd } from "../../utils/dateTime";
+import { buoiOfIso, formatTime } from "../../utils/dateTime";
 import { nextActionable } from "../../utils/doseStatus";
 
 export default function HomeScreen() {
   const { user, profile, timezone } = useAuth();
   const [data, setData] = useState<TodayDoses | null>(null);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [acting, setActing] = useState(false);
 
@@ -21,10 +20,9 @@ export default function HomeScreen() {
     try {
       const res = await getTodayDoses();
       setData(res);
-    } catch (e) {
+    } catch {
       setData(null);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   }, []);

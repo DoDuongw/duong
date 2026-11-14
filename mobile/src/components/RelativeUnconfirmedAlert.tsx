@@ -1,10 +1,9 @@
-import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { Text } from './Text';
 import type { DoseWithMedication } from '../types';
 import { formatDate, formatTime } from '../utils/dateTime';
 import { DOSE_STATUS_ICON, DOSE_STATUS_LABEL, RELATIVE_ALERT_AFTER_MINUTES, unconfirmedAlerts } from '../utils/doseStatus';
-import { colors, spacing, radius, typography } from '../theme';
+import { spacing, radius, typography } from '../theme';
 
 interface Props {
   ownerName: string;
@@ -36,6 +35,7 @@ export function RelativeUnconfirmedAlert({ ownerName, timeZone, doses, date, tod
             {dose.imageUrl ? <Image source={{ uri: dose.imageUrl }} style={styles.thumb} /> : null}
             <Text style={styles.itemText}>
               {DOSE_STATUS_ICON[dose.status] || ''} {dose.medicationName ?? 'Thuốc'} — {formatTime(dose.scheduledAt, timeZone)} · {DOSE_STATUS_LABEL[dose.status]}
+              {dose.status === 'cannot_take' && dose.cannotTakeReason ? ` · ${dose.cannotTakeReason}` : ''}
             </Text>
           </View>
         ))}

@@ -2,10 +2,21 @@ import Constants from "expo-constants";
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>;
 
+const envConfig: Record<string, string | undefined> = {
+  API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
+  FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  FIREBASE_VAPID_KEY: process.env.EXPO_PUBLIC_FIREBASE_VAPID_KEY,
+};
+
 function readConfig(key: string): string {
   const fromExtra = extra[key];
   if (typeof fromExtra === "string" && fromExtra.trim()) return fromExtra.trim();
-  const fromEnv = process.env[`EXPO_PUBLIC_${key}`];
+  const fromEnv = envConfig[key];
   return typeof fromEnv === "string" ? fromEnv.trim() : "";
 }
 
@@ -49,7 +60,6 @@ export const API_BASE: string =
   devLanApiBase() ||
   (isUsable(process.env.EXPO_PUBLIC_API_BASE_URL) ? process.env.EXPO_PUBLIC_API_BASE_URL!.trim() : null) ||
   "http://10.0.2.2:3000/api/v1";
-export const SERVER_ORIGIN: string = API_BASE.replace(/\/api\/v1\/?$/, "");
 
 export const firebaseConfig = {
   apiKey: readConfig("FIREBASE_API_KEY"),

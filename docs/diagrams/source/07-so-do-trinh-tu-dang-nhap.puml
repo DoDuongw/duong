@@ -1,0 +1,44 @@
+@startuml
+title Trình tự đăng nhập và đồng bộ hồ sơ
+autonumber
+actor "Người dùng" as User
+participant "Expo app\n(mobile/ hoặc Expo Web)" as App
+participant "Firebase Authentication" as Firebase
+participant "Express API" as API
+participant "authMiddleware" as Auth
+database "MongoDB" as DB
+
+User -> App : mở ứng dụng
+App -> App : AuthProvider theo dõi onAuthChange
+alt chưa có phiên đăng nhập
+  App --> User : chuyển tới /welcome
+  User -> App : nhập email/SĐT + mật khẩu
+  App -> Firebase : signIn / signUp
+  Firebase --> App : Firebase ID token + user
+  App -> API : GET /api/v1/users/me\nAuthorization: Bearer <token>
+  API -> Auth : verifyIdToken + kiểm tra disabled_at
+  Auth -> DB : tìm user theo firebase_uid
+  alt chưa có hồ sơ (401/404)
+    App -> API : POST /api/v1/users/me/sync\n(displayName, phone, address, dateOfBirth, timezone)
+    API -> Auth : requireFirebaseAuthMiddleware
+    API -> DB : tạo hoặc cập nhật user
+    DB --> API : hồ sơ + role
+    API --> App : JSON hồ sơ
+  else đã có hồ sơ
+    DB --> API : hồ sơ + role
+    API --> App : JSON hồ sơ
+  end
+  App -> App : đăng ký push token\n(expo-notifications / FCM Web)
+  App --> User : chuyển tới /(tabs)
+else đã có phiên đăng nhập
+  App -> API : GET /api/v1/users/me
+  API --> App : hồ sơ hiện tại
+  App --> User : chuyển tới /(tabs)
+end
+
+note over API,DB
+  Mọi API dưới /api/v1 đều đi qua authMiddleware.
+  Tài khoản có disabled_at bị chặn bằng 403.
+  Email xác minh được đồng bộ từ Firebase khi có token.
+end note
+@enduml

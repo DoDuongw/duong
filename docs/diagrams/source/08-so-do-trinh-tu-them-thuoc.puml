@@ -1,0 +1,43 @@
+@startuml
+title Trình tự thêm thuốc và lịch uống
+autonumber
+actor "Chủ hồ sơ" as User
+participant "MedicationNew\n(mobile/)" as App
+participant "Express API" as API
+participant "authMiddleware" as Auth
+participant "familyAccess" as Access
+database "MongoDB" as DB
+
+User -> App : nhập tên thuốc, liều, hướng dẫn,\nngày bắt đầu/kết thúc, giờ uống
+opt có ảnh thuốc
+  App -> API : POST /api/v1/uploads/medication-image\n(multipart/form-data)
+  API --> App : URL ảnh trong /uploads
+end
+App -> API : POST /api/v1/medications\n(Bearer token + JSON)
+API -> Auth : verifyIdToken
+Auth --> API : userId
+API -> Access : resolveOwnerAccess(req, manage=true)
+Access --> API : ownerId + quyền manage_medication
+
+API -> API : Zod validate + kiểm tra startDate <= endDate
+alt dữ liệu sai hoặc không đủ quyền
+  API --> App : 400 / 403
+  App --> User : hiển thị lỗi
+else hợp lệ
+  API -> DB : tạo Medication
+  loop mỗi giờ uống trong request
+    API -> DB : tạo MedicationSchedule (version 1)
+    API -> DB : tạo ScheduleVersion v1
+  end
+  API -> DB : ghi AuditLog action=create
+  DB --> API : thuốc + danh sách lịch
+  API --> App : 201 JSON
+  App --> User : quay lại danh sách thuốc
+end
+
+note over API,DB
+  Tạo thuốc không sinh lần uống ngay.
+  Lần uống được sinh bởi cron hằng ngày hoặc khi thêm/sửa một lịch.
+  Lịch sử lần uống cũ không bị sửa khi đổi lịch.
+end note
+@enduml

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AppState } from "react-native";
 import { ApiError } from "../services/api";
 import { getProfile, syncProfile } from "../services/endpoints";
 import {
@@ -12,12 +13,12 @@ import {
   signOut as firebaseSignOut,
   signUp as firebaseSignUp,
 } from "../services/firebase";
-import { registerDevicePushToken } from "../services/notifications";
+import { disablePushNotifications, registerDevicePushToken } from "../services/notifications";
 import { AuthContext, type AuthContextValue, type AuthUser } from "./authContext";
 import { firebaseAuthMessage } from "../utils/firebaseErrors";
 import type { UserProfile } from "../types";
 
-export const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
+const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [initializing, setInitializing] = useState(true);
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!nextUser) {
         setProfile(null);
         setInitializing(false);
+        void disablePushNotifications();
         return;
       }
       void loadProfile()
@@ -66,6 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return unsubscribe;
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (!user) return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void registerDevicePushToken();
+    });
+    return () => sub.remove();
+  }, [user]);
 
   const login = useCallback(
     async (identifier: string, password: string) => {
@@ -112,6 +122,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     setError(null);
+    try {
+      // Hủy token Web Push trước khi mất phiên đăng nhập (cần auth để gọi backend).
+      await disablePushNotifications();
+    } catch {
+      // best-effort
+    }
     try {
       await firebaseSignOut();
     } catch {

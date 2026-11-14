@@ -1,0 +1,44 @@
+@startuml
+title Quản lý trạng thái tài khoản trong khu vận hành
+autonumber
+actor "Quản lý / Admin" as Staff
+participant "Tab operations\n(admin/index)" as App
+participant "Express API" as API
+participant "authMiddleware" as Auth
+participant "adminService" as Service
+participant "Firebase Admin" as Firebase
+database "MongoDB" as DB
+
+Staff -> App : chọn khóa hoặc mở khóa tài khoản
+App -> API : PATCH /api/v1/admin/users/{id}/status\n{ disabled: true|false }
+API -> Auth : verify token + requireStaffMiddleware
+Auth --> API : role manager/admin
+API -> Service : setUserDisabled(actorId, actorRole, targetId, disabled)
+
+Service -> DB : đọc user mục tiêu
+alt tự khóa chính mình
+  Service --> API : 400
+else manager thao tác tài khoản manager/admin
+  Service --> API : 403
+else hợp lệ
+  Service -> Firebase : disabled=true/false
+  opt khóa tài khoản
+    Service -> Firebase : revoke refresh token
+  end
+  Firebase --> Service : thành công
+  Service -> DB : cập nhật disabled_at
+  Service -> DB : ghi AuditLog\nadmin_lock / admin_unlock
+  DB --> Service : trạng thái mới
+  Service --> API : { id, disabled }
+  API --> App : JSON
+  App --> Staff : cập nhật danh sách người dùng
+end
+
+note over Auth,DB
+  authMiddleware chặn mọi API nếu disabled_at có giá trị.
+  Chỉ admin được đổi vai trò và xóa vĩnh viễn tài khoản user.
+  Đặt lại mật khẩu qua khu vực admin bị chặn (403).
+  Không thể hạ quyền admin đang hoạt động cuối cùng.
+  Không ghi mật khẩu/token vào audit log.
+end note
+@enduml

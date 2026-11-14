@@ -1,0 +1,78 @@
+@startuml
+title Tác nhân và chức năng của MedReminder
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "Người cao tuổi\n(chủ hồ sơ)" as Elder
+actor "Người thân" as Relative
+actor "Quản lý vận hành" as Manager
+actor "Quản trị hệ thống" as Admin
+
+rectangle "MedReminder — Expo app + Express API" {
+  usecase "Đăng ký / đăng nhập /\nquên mật khẩu" as Auth
+  usecase "Xem trang chủ và tiến độ hôm nay" as Home
+  usecase "Xem lịch và lần uống" as Schedule
+  usecase "Xác nhận đã uống / nhắc lại /\nkhông thể uống" as DoseAction
+  usecase "Xem lịch sử uống thuốc" as History
+  usecase "Quản lý thuốc và lịch uống" as Meds
+  usecase "Nhận push nhắc thuốc /\nquá giờ / hỏi thăm sức khỏe" as Notify
+  usecase "Xem thông báo trong ứng dụng" as Inbox
+  usecase "Trả lời hỏi thăm sức khỏe" as Wellness
+  usecase "Tạo mã mời / kết nối người thân" as Invite
+  usecase "Quản lý quyền và ngắt kết nối" as Family
+  usecase "Xem cảnh báo của người thân" as Alerts
+  usecase "Quản lý hồ sơ và cài đặt" as Settings
+  usecase "Xem dashboard vận hành" as Ops
+  usecase "Khóa / mở / xóa tài khoản" as Moderation
+  usecase "Đổi vai trò tài khoản" as Role
+}
+
+Elder --> Auth
+Elder --> Home
+Elder --> Schedule
+Elder --> DoseAction
+Elder --> History
+Elder --> Meds
+Elder --> Notify
+Elder --> Inbox
+Elder --> Wellness
+Elder --> Invite
+Elder --> Family
+Elder --> Settings
+
+Relative --> Auth
+Relative --> Schedule
+Relative --> History
+Relative --> Meds
+Relative --> Notify
+Relative --> Inbox
+Relative --> Family
+Relative --> Alerts
+
+Manager --> Auth
+Manager --> Ops
+Manager --> Moderation
+
+Admin --> Auth
+Admin --> Ops
+Admin --> Moderation
+Admin --> Role
+
+note right of Relative
+  Người thân có view_schedule được xem lịch,
+  thuốc và lịch sử ở chế độ chỉ xem.
+  Chỉ chủ hồ sơ được xác nhận / nhắc lại /
+  đánh dấu không thể uống.
+end note
+
+note bottom of Notify
+  Server gửi push qua FCM hoặc Expo Push.
+  Native dùng expo-notifications; Expo Web dùng Service Worker.
+end note
+
+note bottom of Moderation
+  manager/admin xem dashboard, khóa/mở tài khoản user.
+  Chỉ admin đổi vai trò và xóa vĩnh viễn tài khoản user.
+end note
+@enduml

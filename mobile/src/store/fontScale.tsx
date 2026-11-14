@@ -36,16 +36,3 @@ export function FontScaleProvider({ children }: { children: React.ReactNode }) {
 export function useFontScale() {
   return useContext(FontScaleContext);
 }
-
-export function scaledStyle<T extends Record<string, any> | undefined | null>(
-  style: T,
-  multiplier: number,
-): T {
-  if (!style || multiplier === 1) return style;
-  const flat = Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style;
-  if (!flat || typeof flat !== 'object') return style;
-  const out: any = { ...(flat as any) };
-  if (typeof out.fontSize === 'number') out.fontSize = Math.round(out.fontSize * multiplier);
-  if (typeof out.lineHeight === 'number') out.lineHeight = Math.round(out.lineHeight * multiplier);
-  return out as T;
-}

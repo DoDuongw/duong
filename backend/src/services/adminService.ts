@@ -11,11 +11,9 @@ import { AuditLog } from '../models/AuditLog';
 import {
   deleteFirebaseUser,
   getFirebaseUserDetails,
-  getFirebaseUserEmails,
   isFirebaseReady,
   revokeFirebaseRefreshTokens,
   setFirebaseUserDisabled,
-  setFirebaseUserPassword,
 } from '../config/firebase';
 import { badRequest, forbidden, notFound, serviceUnavailable } from '../utils/errors';
 import { notificationErrorLabel } from '../utils/notificationLabels';
@@ -75,7 +73,7 @@ export async function getSummary(): Promise<AdminSummary> {
   };
 }
 
-export interface AdminUserItem {
+interface AdminUserItem {
   id: string;
   displayName: string | null;
   phone: string | null;
@@ -309,34 +307,6 @@ export async function setUserDisabled(
   });
 
   return { id: String(user._id), disabled: Boolean(user.disabled_at) };
-}
-
-/** Đặt lại mật khẩu (không trả/ghi lại mật khẩu ở bất kỳ đâu) */
-export async function resetUserPassword(
-  adminId: string,
-  targetId: string,
-  password: string,
-): Promise<{ id: string; reset: true }> {
-  const user = await User.findById(targetId);
-  if (!user) throw notFound('Không tìm thấy người dùng');
-  if (!user.firebase_uid) throw badRequest('Người dùng chưa có tài khoản Firebase');
-
-  try {
-    await setFirebaseUserPassword(user.firebase_uid, password);
-    await revokeFirebaseRefreshTokens(user.firebase_uid);
-  } catch {
-    firebaseFailure('đặt lại mật khẩu');
-  }
-
-  await AuditLog.create({
-    user_id: targetId,
-    entity: 'user',
-    entity_id: targetId,
-    action: 'admin_reset_password',
-    details: { admin_id: adminId },
-  });
-
-  return { id: String(user._id), reset: true };
 }
 
 /** Đổi vai trò tài khoản (chỉ admin; không tự hạ quyền; giữ ít nhất một admin đang hoạt động) */

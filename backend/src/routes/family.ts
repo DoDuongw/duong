@@ -3,6 +3,10 @@ import { createHash, randomInt } from 'crypto';
 import { z } from 'zod';
 import { FamilyInvite } from '../models/FamilyInvite';
 import { FamilyConnection } from '../models/FamilyConnection';
+import { NotificationLog } from '../models/NotificationLog';
+import { NotificationHistory } from '../models/NotificationHistory';
+import { DoseOccurrence } from '../models/DoseOccurrence';
+import { Medication } from '../models/Medication';
 import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
 import { ok } from '../middlewares/errorHandler';
@@ -139,6 +143,85 @@ router.get('/connections', async (req: Request, res: Response, next: NextFunctio
       };
     });
     ok(res, result);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get('/alerts', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = currentUserId(req);
+    const conns = await FamilyConnection.find({
+      relative_id: userId,
+      status: 'active',
+      'permissions.relative_alerts': true,
+    });
+    const ownerIds = conns.map((c) => c.owner_id.toString());
+    if (ownerIds.length === 0) {
+      ok(res, []);
+      return;
+    }
+
+    const logs = await NotificationLog.find({ kind: 'relative_alert' })
+      .sort({ sent_at: -1 })
+      .limit(200);
+    if (logs.length === 0) {
+      ok(res, []);
+      return;
+    }
+
+    const doseIds = [...new Set(logs.map((l) => l.dose_id.toString()))];
+    // Trạng thái gửi chính xác theo từng người thân (một người có thể đã nhận,
+    // người khác chưa có thiết bị). NotificationLog chỉ phản ánh cả lô gửi.
+    const histories = await NotificationHistory.find({
+      user_id: userId,
+      kind: 'relative_alert',
+      dose_id: { $in: doseIds },
+    }).select('dose_id status error sent_at');
+    const historyByDose = new Map(
+      histories.map((h) => [h.dose_id ? h.dose_id.toString() : '', h]),
+    );
+    const doses = await DoseOccurrence.find({
+      _id: { $in: doseIds },
+      user_id: { $in: ownerIds },
+    });
+    const doseMap = new Map(doses.map((d) => [d._id.toString(), d]));
+
+    const medIds = [...new Set(doses.map((d) => d.medication_id.toString()))];
+    const meds = await Medication.find({ _id: { $in: medIds } });
+    const medMap = new Map(meds.map((m) => [m._id.toString(), m]));
+
+    const owners = await User.find({ _id: { $in: ownerIds } });
+    const ownerMap = new Map(owners.map((u) => [u._id.toString(), u]));
+
+    const seen = new Set<string>();
+    const items: Array<Record<string, unknown>> = [];
+    for (const log of logs) {
+      const dose = doseMap.get(log.dose_id.toString());
+      if (!dose || seen.has(dose._id.toString())) continue;
+      seen.add(dose._id.toString());
+      const owner = ownerMap.get(dose.user_id.toString());
+      const med = medMap.get(dose.medication_id.toString());
+      const history = historyByDose.get(dose._id.toString());
+      items.push({
+        id: log._id,
+        doseId: dose._id,
+        ownerId: dose.user_id,
+        ownerName: owner?.display_name ?? owner?.phone ?? 'Người thân',
+        ownerTimezone: owner?.timezone ?? 'Asia/Ho_Chi_Minh',
+        medicationName: med?.name ?? 'Thuốc',
+        imageUrl: med?.image_url ?? null,
+        scheduledAt: dose.scheduled_at.toISOString(),
+        status: dose.status,
+        cannotTakeReason: dose.cannot_take_reason,
+        sentAt: (history?.sent_at ?? log.sent_at).toISOString(),
+        deliveryStatus: history?.status ?? log.status,
+        deliveryError: history?.error ?? log.error,
+      });
+      if (items.length >= 30) break;
+    }
+
+    ok(res, items);
   } catch (e) {
     next(e);
   }

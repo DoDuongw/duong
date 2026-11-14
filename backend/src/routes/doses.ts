@@ -9,11 +9,21 @@ import { resolveOwnerAccess } from '../middlewares/familyAccess';
 import { badRequest, notFound } from '../utils/errors';
 import { confirmDose, snoozeDose, cannotTakeDose, generateUpcomingDoses } from '../services/doseService';
 import { notifyRelativeAlert, firebasePushSender } from '../services/notificationService';
-import { endOfLocalDayUtc, startOfLocalDayUtc, todayLocal } from '../utils/time';
+import { endOfLocalDayUtc, localYmd, startOfLocalDayUtc, todayLocal } from '../utils/time';
 import { env } from '../config/env';
 
 const router = Router();
 router.use(requireAuthMiddleware);
+
+function isValidYmdString(value: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const y = +m[1];
+  const mo = +m[2];
+  const d = +m[3];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
 
 function doseToJson(d: DoseOccurrenceDoc) {
   return {
@@ -57,7 +67,7 @@ router.get('/today', async (req: Request, res: Response, next: NextFunction) => 
     const access = await resolveOwnerAccess(req);
     const tz = access.timezone;
     const ymd = todayLocal(tz);
-    await generateUpcomingDoses(env.DOSE_GENERATION_DAYS, tz);
+    await generateUpcomingDoses(env.DOSE_GENERATION_DAYS, tz, undefined, access.ownerId);
 
     const doses = await fetchDosesWithMedication(
       access.ownerId,
@@ -134,7 +144,59 @@ router.post('/:id/cannot-take', async (req: Request, res: Response, next: NextFu
     const dose = await cannotTakeDose(req.params.id, currentUserId(req), parsed.data.reason);
     ok(res, doseToJson(dose));
     // Best-effort: báo người thân có bật cảnh báo (nếu FCM/kết nối khả dụng)
-    void notifyRelativeAlert(req.params.id, { sender: firebasePushSender }, { allowCannotTake: true }).catch(() => {});
+    void notifyRelativeAlert(req.params.id, { sender: firebasePushSender }).catch(() => {});
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get('/range', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const access = await resolveOwnerAccess(req);
+    const tz = access.timezone;
+    const from = String(req.query.from ?? '');
+    const to = String(req.query.to ?? '');
+    if (!isValidYmdString(from) || !isValidYmdString(to)) {
+      throw badRequest('from và to phải là ngày hợp lệ dạng YYYY-MM-DD');
+    }
+    const fromUtc = startOfLocalDayUtc(tz, from);
+    const toUtc = endOfLocalDayUtc(tz, to);
+    if (toUtc < fromUtc) throw badRequest('Khoảng ngày không hợp lệ');
+    const spanDays = Math.round(
+      (Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)) -
+        Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))) /
+        86_400_000,
+    );
+    if (spanDays > 62) throw badRequest('Chỉ hỗ trợ khoảng ngày tối đa 62 ngày');
+
+    // Bảo đảm các lần uống gần nhất đã được sinh (7 ngày tới theo cấu hình).
+    await generateUpcomingDoses(env.DOSE_GENERATION_DAYS, tz, undefined, access.ownerId);
+
+    const doses = await DoseOccurrence.find({
+      user_id: access.ownerId,
+      scheduled_at: { $gte: fromUtc, $lte: toUtc },
+    })
+      .select('scheduled_at status')
+      .sort({ scheduled_at: 1 });
+
+    const map = new Map<
+      string,
+      { date: string; total: number; confirmed: number; remaining: number; missed: number; cannotTake: number }
+    >();
+    for (const dose of doses) {
+      const date = localYmd(dose.scheduled_at, tz);
+      const item =
+        map.get(date) ??
+        { date, total: 0, confirmed: 0, remaining: 0, missed: 0, cannotTake: 0 };
+      item.total += 1;
+      if (dose.status === 'confirmed') item.confirmed += 1;
+      else if (dose.status === 'missed') item.missed += 1;
+      else if (dose.status === 'cannot_take') item.cannotTake += 1;
+      else item.remaining += 1;
+      map.set(date, item);
+    }
+
+    ok(res, { from, to, days: Array.from(map.values()) });
   } catch (e) {
     next(e);
   }

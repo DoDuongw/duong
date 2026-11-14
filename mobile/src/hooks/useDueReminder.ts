@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 import { getTodayDoses } from '../services/endpoints';
 import { firstDueDose } from '../utils/doseStatus';

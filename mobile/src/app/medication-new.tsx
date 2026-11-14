@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,12 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Card, Button, Input, Text, TimeField } from '../components';
+import { Card, Button, DateField, Input, Text, TimeField } from '../components';
 import { colors, spacing, typography } from '../theme';
-import { createMedication } from '../services/endpoints';
+import { createMedication, uploadMedicationImage } from '../services/endpoints';
 import { todayYmd } from '../utils/dateTime';
 import { validateMedicationForm } from '../utils/validation';
-import { uploadImageToStorage } from '../services/firebase';
 
 export default function MedicationNewScreen() {
   const [name, setName] = useState('');
@@ -50,10 +49,7 @@ export default function MedicationNewScreen() {
       if (result.canceled || !result.assets?.[0]?.uri) return;
       setImageUploading(true);
       const uri = result.assets[0].uri;
-      const extGuess = uri.split('.').pop()?.toLowerCase().split('?')[0];
-      const ext = extGuess && /^[a-z0-9]+$/.test(extGuess) ? extGuess : 'jpg';
-      const path = `medication-images/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-      const downloadUrl = await uploadImageToStorage(uri, path);
+      const downloadUrl = await uploadMedicationImage(uri);
       setImageUrl(downloadUrl);
     } catch (e: any) {
       setImageError(e?.message || 'Không tải ảnh lên được. Vui lòng thử lại.');
@@ -166,13 +162,21 @@ export default function MedicationNewScreen() {
             <Text style={[styles.label, { marginTop: spacing.xs }]}>Hoặc dán đường dẫn ảnh</Text>
             <Input value={imageUrl} onChangeText={setImageUrl} placeholder="https://…" autoCapitalize="none" />
 
-            <Text style={styles.label}>Ngày bắt đầu <Text style={styles.req}>*</Text></Text>
-            <Input value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" autoCapitalize="none" />
-            {fieldErrors.startDate ? <Text style={styles.error}>{fieldErrors.startDate}</Text> : null}
-
-            <Text style={styles.label}>Ngày kết thúc</Text>
-            <Input value={endDate} onChangeText={setEndDate} placeholder="Để trống nếu dùng không có hạn" autoCapitalize="none" />
-            {fieldErrors.endDate ? <Text style={styles.error}>{fieldErrors.endDate}</Text> : null}
+            <DateField
+              label="Ngày bắt đầu *"
+              value={startDate}
+              onChange={setStartDate}
+              error={fieldErrors.startDate}
+            />
+            <DateField
+              label="Ngày kết thúc"
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="Để trống nếu dùng không có hạn"
+              error={fieldErrors.endDate}
+              defaultValue={startDate}
+              clearable
+            />
           </Card>
 
           <Card style={styles.card}>

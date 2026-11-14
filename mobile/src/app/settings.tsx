@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, Alert, Platform, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, Alert, Platform, Pressable, Share } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
@@ -9,11 +9,10 @@ import { colors, spacing, typography } from "../theme";
 import { API_BASE } from "../config";
 import {
   listFamilyConnections,
-  registerDevice,
   updateFamilyPermissions,
   updateNotificationSettings,
 } from "../services/endpoints";
-import { getPushTokenAsync } from "../services/notifications";
+import { enablePushNotifications, getCurrentPushToken } from "../services/notifications";
 import { changeOwnPassword, isInternalMedEmail } from "../services/firebase";
 import { FONT_SCALE_LABEL } from "../utils/fontScale";
 import { useFontScale } from "../store/fontScale";
@@ -26,6 +25,10 @@ export default function SettingsScreen() {
   const [snoozeMax, setSnoozeMax] = useState(String(prefs.snoozeMax ?? 3));
   const [saving, setSaving] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [pushToken, setPushToken] = useState<string | null>(() => getCurrentPushToken());
+  const [pushPlatform, setPushPlatform] = useState<'android' | 'ios' | 'web' | null>(() =>
+    getCurrentPushToken() ? 'web' : null,
+  );
   const [verifyBusy, setVerifyBusy] = useState(false);
   const { scale: fontScale, setScale: setFontScale } = useFontScale();
 
@@ -115,17 +118,27 @@ export default function SettingsScreen() {
   async function handleRegisterPush() {
     try {
       setPushBusy(true);
-      const token = await getPushTokenAsync();
-      if (!token) {
+      const result = await enablePushNotifications({ requestPermission: true });
+      if (!result.token) {
         Alert.alert(
-          'Chưa đăng ký được',
-          'Không lấy được token thông báo. Cần: (1) điện thoại thật (không phải trình giả lập), (2) đã cấp quyền thông báo, (3) app kết nối được máy chủ (xem mục chẩn đoán bên dưới). Với thông báo FCM từ backend, thường cần development build/EAS + google-services.json/GoogleService-Info.plist; Expo Go có thể bị giới hạn.',
+          Platform.OS === 'web' ? 'Chưa bật được thông báo trên trình duyệt' : 'Chưa đăng ký được',
+          result.message ||
+            (Platform.OS === 'web'
+              ? 'Trình duyệt chưa cấp quyền hoặc chưa cấu hình VAPID key. Kiểm tra quyền thông báo của trang rồi thử lại.'
+              : 'Không lấy được token thông báo. Cần: (1) điện thoại thật (không phải trình giả lập), (2) đã cấp quyền thông báo, (3) app kết nối được máy chủ (xem mục chẩn đoán bên dưới), (4) khởi động lại Expo bằng "npx expo start -c" để nhận projectId mới. Nếu vẫn lỗi, kiểm tra đăng nhập Expo và kết nối mạng.'),
         );
         return;
       }
-      const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
-      await registerDevice({ fcmToken: token, platform });
-      Alert.alert('Đã đăng ký', `Đã gửi token thiết bị lên hệ thống.\nNền tảng: ${platform}\nToken (rút gọn): ${token.slice(0, 18)}…\n\nLưu ý: thông báo đẩy khi đến giờ phụ thuộc backend gửi FCM và cấu hình Firebase của bản build. Nếu backend chưa cấu hình FCM, bạn vẫn có banner nhắc trong app nhưng có thể không có thông báo hệ thống/có tiếng.`);
+      setPushToken(result.token);
+      setPushPlatform(result.platform);
+      if (result.platform === 'web') {
+        Alert.alert(
+          'Đã bật thông báo trên trình duyệt',
+          `Đã đăng ký Web Push cho trình duyệt này.\nToken (rút gọn): ${result.token.slice(0, 18)}…\n\nHãy giữ tab hoặc trình duyệt mở để nhận thông báo đúng giờ.`,
+        );
+      } else {
+        Alert.alert('Đã đăng ký', `Đã gửi token thiết bị lên hệ thống.\nNền tảng: ${result.platform}\nToken (rút gọn): ${result.token.slice(0, 18)}…\n\nToken đầy đủ ở mục “Token thiết bị” bên dưới. Bạn có thể sao chép token đó để gửi thử trên expo.dev/notifications.`);
+      }
     } catch (e: any) {
       Alert.alert('Lỗi đăng ký thiết bị', e?.message || 'Không thể đăng ký thiết bị. Kiểm tra kết nối máy chủ (API_BASE) và thử lại.');
     } finally {
@@ -206,6 +219,8 @@ export default function SettingsScreen() {
 
   const email = (user as any)?.email as string | undefined;
   const needsVerification = !!email && !isInternalMedEmail(email) && !(user as any)?.emailVerified;
+  const isWebPush = pushPlatform === 'web';
+  const isExpoToken = !!pushToken && /^Expo(nent)?PushToken\[.+\]$/.test(pushToken);
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
@@ -328,18 +343,56 @@ export default function SettingsScreen() {
 
         <Section title="Âm thanh và thông báo" icon="🔊">
           <Text style={styles.muted}>
-            Trên ứng dụng di động, âm thanh nhắc được điều khiển bởi hệ thống thông báo đẩy của thiết bị. Hãy bật quyền thông báo và âm thanh trong cài đặt điện thoại.
+            {Platform.OS === 'web'
+              ? 'Trên trình duyệt, âm thanh và kiểu hiển thị do hệ điều hành/trình duyệt quyết định. Hãy bật quyền thông báo cho trang này.'
+              : 'Trên ứng dụng di động, âm thanh nhắc được điều khiển bởi hệ thống thông báo đẩy của thiết bị. Hãy bật quyền thông báo và âm thanh trong cài đặt điện thoại.'}
           </Text>
         </Section>
 
         <Section title="Thông báo đẩy" icon="🔔">
-          <Text style={styles.muted}>Nhắc uống thuốc ngay trên thiết bị này.</Text>
+          <Text style={styles.muted}>
+            {isWebPush ? 'Nhắc uống thuốc ngay trên trình duyệt này (Web Push).' : 'Nhắc uống thuốc ngay trên thiết bị này.'}
+          </Text>
           <Button variant="secondary" onPress={handleRegisterPush} loading={pushBusy} disabled={pushBusy} style={styles.mt}>
             Bật / kiểm tra thông báo đẩy
           </Button>
           <Text style={styles.hint}>
-            Để nhận thông báo đẩy từ backend (FCM), cần thiết bị thật và cấu hình Firebase/FCM cho bản build (google-services, credentials). Token đăng ký tự động khi đăng nhập nếu có thể.
+            {Platform.OS === 'web'
+              ? 'Web Push chỉ hoạt động trên localhost hoặc HTTPS. Trình duyệt sẽ hỏi quyền thông báo; hãy chọn “Cho phép”. Nếu tab hoặc trình duyệt bị đóng hoàn toàn, thông báo có thể không tới (tùy trình duyệt). Trên iPhone/iPad Safari cần “Thêm vào màn hình chính” (PWA).'
+              : 'Với Expo SDK 58, Expo Go không nhận được thông báo đẩy từ xa. Cần cài bản development/preview build (EAS) trên điện thoại thật. Sau khi cấp quyền, token phải bắt đầu bằng ExpoPushToken[...].'}
           </Text>
+          {pushToken ? (
+            <View style={styles.tokenBox}>
+              <Text style={styles.label}>{isWebPush ? 'Token Web Push (đầy đủ)' : 'Token thiết bị (đầy đủ)'}</Text>
+              <Text style={styles.tokenText} selectable>
+                {pushToken}
+              </Text>
+              {isWebPush ? (
+                <Notice tone="success" icon={false}>
+                  <Text style={{ color: '#166534' }}>
+                    Đã đăng ký Web Push. Token FCM này được backend dùng để gửi thông báo qua Firebase Cloud Messaging.
+                  </Text>
+                </Notice>
+              ) : !isExpoToken ? (
+                <Notice tone="error" icon={false}>
+                  <Text style={{ color: '#991b1b' }}>
+                    Token này không phải Expo Push Token. Backend có thể không gửi được bằng Expo Push Service;
+                    hãy kiểm tra lại projectId và dùng development build.
+                  </Text>
+                </Notice>
+              ) : null}
+              <Button
+                variant="secondary"
+                onPress={() => void Share.share({ message: pushToken })}
+                style={styles.mt}
+              >
+                Chia sẻ token
+              </Button>
+              <Text style={styles.hint}>
+                Nhấn giữ token để chọn và sao chép, hoặc bấm “Chia sẻ token” để gửi sang máy khác.
+              </Text>
+            </View>
+          ) : null}
         </Section>
 
         <Section title="Kết nối máy chủ (chẩn đoán)" icon="🖧">
@@ -390,6 +443,8 @@ const styles = StyleSheet.create({
   label: { ...typography.bodySm, fontWeight: '700', color: colors.text, marginTop: spacing.sm, marginBottom: 6 },
   hint: { ...typography.caption, color: colors.muted, marginTop: spacing.sm, lineHeight: 18 },
   code: { ...typography.caption, color: colors.text, marginTop: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  tokenBox: { marginTop: spacing.sm, padding: spacing.sm, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  tokenText: { ...typography.caption, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginTop: 4 },
   mt: { marginTop: spacing.sm },
   scaleRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   scaleBtn: { flex: 1 },

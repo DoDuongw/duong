@@ -45,11 +45,11 @@
 
 ### 3.4 Thông báo người thân (FCM)
 
-- **Ngưỡng (thay đổi 20/10/2026 — yêu cầu của người dùng)**: khi lần uống **chưa được xác nhận quá `RELATIVE_ALERT_AFTER_MINUTES` phút** (mặc định **15** — trước đó là khi chuyển `missed` = 2 giờ) và connection có `permissions.relative_alerts=true` → push tới người thân: “Người thân X chưa uống thuốc Y lúc HH:mm” *(đã triển khai ở Giai đoạn 6, đổi ngưỡng ở Giai đoạn 7; hàm `notifyRelativeAlert`)*.
+- **Ngưỡng (cập nhật 12/11/2026 — yêu cầu của người dùng)**: khi lần uống **chưa được xác nhận quá `RELATIVE_ALERT_AFTER_MINUTES` phút** (mặc định **10**) và connection có `permissions.relative_alerts=true` → push tới người thân: “Người thân X chưa uống thuốc Y lúc HH:mm” *(hàm `notifyRelativeAlert`)*.
 - **Mốc tính từ giờ đến hạn cuối cùng**: nếu lần uống đã “nhắc lại sau” thì mốc là `snoozed_until` (mốc được kéo dài), không tính lại từ giờ hẹn gốc — tránh báo người thân trong khi người già đang thao tác.
-- Người thân **đã xác nhận** hoặc **đánh dấu không thể uống** → không gửi. Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống chỉ một push.
-- Cửa sổ bù (server vừa bật lại): `RELATIVE_ALERT_AFTER_MINUTES + 30` phút. Lưới an toàn: nếu tới lúc chuyển `missed` (2 giờ) mà chưa từng gửi thì vẫn báo.
-- Số phút cấu hình ở `backend/.env` (`RELATIVE_ALERT_AFTER_MINUTES`, mặc định 15).
+- **Chỉ trạng thái `confirmed` là không gửi.** Mọi trạng thái khác — `pending`/`snoozed`/`overdue`/`missed`/`cannot_take` (không uống được, đang bận…) — đều báo người thân. Bấm “không thể uống” → gửi ngay (nếu chưa từng gửi cho lần uống đó). Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống tối đa một push.
+- Cửa sổ bù (server vừa bật lại): `RELATIVE_ALERT_AFTER_MINUTES + 30` phút. Lưới an toàn: nếu tới lúc chuyển `missed` (2 giờ) mà chưa từng gửi thì vẫn báo; cron cũng quét lại `cannot_take` trong cửa sổ để thử lại khi push tức thời lỗi.
+- Số phút cấu hình ở `backend/.env` (`RELATIVE_ALERT_AFTER_MINUTES`, mặc định 10).
 - Chỉ gửi khi connection active và có quyền; payload chỉ gồm tên thuốc + tên chủ hồ sơ + giờ.
 
 ### 3.5 Đổi lịch / ngừng thuốc

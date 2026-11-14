@@ -378,4 +378,4 @@ router.put('/schedules/:id', async (req: Request, res: Response, next: NextFunct
   }
 });
 
-export { router as medicationsRouter, scheduleToJson, medToJson };
+export { router as medicationsRouter };

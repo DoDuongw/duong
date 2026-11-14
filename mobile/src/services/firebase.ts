@@ -14,22 +14,15 @@ import {
   type Unsubscribe,
   type User,
 } from "firebase/auth";
-import { getStorage, ref, uploadBytes, getDownloadURL, type FirebaseStorage } from "firebase/storage";
 import { firebaseConfig, isFirebaseConfigured } from "../config";
 import { normalizePhone, phoneToInternalEmail } from "../utils/phone";
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
-let storage: FirebaseStorage | null = null;
 
 if (isFirebaseConfigured) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  try {
-    storage = getStorage(app);
-  } catch {
-    storage = null;
-  }
 }
 
 export { isFirebaseConfigured };
@@ -141,24 +134,6 @@ export async function changeOwnPassword(currentPassword: string, newPassword: st
 export async function getIdToken(): Promise<string | null> {
   if (!auth?.currentUser) return null;
   return auth.currentUser.getIdToken();
-}
-
-export function getFirebaseStorage(): FirebaseStorage | null {
-  return storage;
-}
-
-/**
- * Upload ảnh lên Firebase Storage và trả về download URL.
- * Hỗ trợ URI file/content (native) và blob: (web). Yêu cầu Firebase đã cấu hình và Storage khả dụng.
- */
-export async function uploadImageToStorage(localUri: string, objectPath: string): Promise<string> {
-  if (!storage) throw new Error('Firebase Storage chưa sẵn sàng. Vui lòng kiểm tra cấu hình.');
-  const response = await fetch(localUri);
-  if (!response.ok) throw new Error('Không đọc được file ảnh để tải lên.');
-  const blob = await response.blob();
-  const storageRef = ref(storage, objectPath);
-  await uploadBytes(storageRef, blob, { contentType: blob.type || 'image/jpeg' });
-  return getDownloadURL(storageRef);
 }
 
 export function onAuthChange(

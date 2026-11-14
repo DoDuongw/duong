@@ -1,0 +1,46 @@
+@startuml
+title Máy trạng thái một lần uống thuốc
+hide empty description
+skinparam shadowing false
+
+[*] --> pending : cron sinh từ lịch đang hoạt động
+
+pending --> confirmed : confirm (clientRequestId)
+pending --> snoozed : snooze
+pending --> cannot_take : không thể uống + lý do
+pending --> overdue : cron: scheduled_at + 30 phút
+pending --> missed : cron: scheduled_at + 120 phút
+
+snoozed --> snoozed : snooze tiếp\n(còn lượt, cùng ngày, <= +120 phút)
+snoozed --> confirmed : confirm
+snoozed --> cannot_take : không thể uống + lý do
+snoozed --> missed : cron: scheduled_at + 120 phút
+
+overdue --> confirmed : confirm muộn
+overdue --> snoozed : snooze
+overdue --> cannot_take : không thể uống + lý do
+overdue --> missed : cron: scheduled_at + 120 phút
+
+confirmed --> [*]
+cannot_take --> [*]
+missed --> [*]
+
+note right of confirmed
+  Trạng thái kết thúc.
+  Nếu now > scheduled_at và vẫn trong cùng ngày địa phương
+  thì is_late_confirmation = true.
+  Cron gửi push hỏi thăm sức khỏe sau 10 phút.
+end note
+
+note right of snoozed
+  snoozeMinutes / snoozeMax lấy từ users.preferences
+  (mặc định 10 phút × 3 lần).
+  Không cho vượt 23:59 cùng ngày hoặc quá scheduled_at + 120 phút.
+end note
+
+note bottom
+  Confirm dùng findOneAndUpdate với điều kiện user_id + status
+  để chống ghi đè lịch sử. Cùng clientRequestId được trả idempotent.
+  Chỉ chủ hồ sơ được thao tác; người thân chỉ xem.
+end note
+@enduml

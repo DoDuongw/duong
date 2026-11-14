@@ -1,13 +1,14 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
-import { Card, Button, Input, StateView, Text } from "../components";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Card, Button, Input, StateView, Text, Notice } from "../components";
 import { colors, spacing, typography, radius } from "../theme";
 import { answerHealthLog, getHealthLogs } from "../services/endpoints";
 import type { HealthAnswer, HealthLogItem } from "../types";
 import { formatDateTime } from "../utils/dateTime";
 import { useAuth } from "../hooks/useAuth";
+import { isHealthAnswer, WELLNESS_ANSWER_LABELS } from "../utils/wellness";
 
 const PAGE_SIZE = 20;
 
@@ -19,22 +20,20 @@ const ANSWER_OPTIONS: { value: HealthAnswer; label: string; color: string; bg: s
   { value: "other", label: "📝 Khác", color: colors.muted, bg: colors.surface2 },
 ];
 
-const ANSWER_LABEL: Record<HealthAnswer, string> = {
-  good: "Bình thường",
-  tired: "Hơi mệt",
-  dizzy: "Chóng mặt",
-  unwell: "Khó chịu",
-  other: "Khác",
-};
-
 export default function HealthJournalScreen() {
-  const { timezone } = useAuth();
+  const { timezone, user, initializing } = useAuth();
+  const params = useLocalSearchParams<{ logId?: string | string[]; answer?: string | string[] }>();
+  const autoLogId = Array.isArray(params.logId) ? params.logId[0] : params.logId;
+  const autoAnswerParam = Array.isArray(params.answer) ? params.answer[0] : params.answer;
+  const autoAnswer = isHealthAnswer(autoAnswerParam) ? autoAnswerParam : null;
+  const autoAnswerKeyRef = useRef<string | null>(null);
   const [items, setItems] = useState<HealthLogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -49,6 +48,38 @@ export default function HealthJournalScreen() {
       setRefreshing(false);
     }
   }, [page]);
+
+  // Nút chọn nhanh trên banner push mở màn này kèm `logId` + `answer`.
+  // Chờ auth xong rồi tự gửi câu trả lời một lần, sau đó tải lại danh sách.
+  useEffect(() => {
+    if (!autoLogId || !autoAnswer || initializing || !user) return;
+    const key = `${autoLogId}:${autoAnswer}`;
+    if (autoAnswerKeyRef.current === key) return;
+    autoAnswerKeyRef.current = key;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await answerHealthLog(autoLogId, { answer: autoAnswer });
+      } catch (e: any) {
+        autoAnswerKeyRef.current = null;
+        if (!cancelled) {
+          setNotice({
+            tone: "error",
+            text: e?.message || "Không lưu được câu trả lời từ thông báo. Bạn có thể chọn lại bên dưới.",
+          });
+        }
+        return;
+      }
+      if (cancelled) return;
+      setNotice({ tone: "success", text: `Đã ghi nhận tình trạng: ${WELLNESS_ANSWER_LABELS[autoAnswer]}` });
+      await load();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoLogId, autoAnswer, initializing, user, load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,6 +97,7 @@ export default function HealthJournalScreen() {
 
   function handleAnswered(updated: HealthLogItem) {
     setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    setNotice(null);
   }
 
   return (
@@ -87,6 +119,12 @@ export default function HealthJournalScreen() {
         <Text style={styles.pageSub}>
           Sau khi bạn xác nhận uống thuốc 10 phút, hệ thống gửi câu hỏi thăm và lưu lại tại đây.
         </Text>
+
+        {notice ? (
+          <Notice tone={notice.tone} icon={notice.tone === "success" ? "✅" : "⚠️"}>
+            {notice.text}
+          </Notice>
+        ) : null}
 
         {loading ? (
           <StateView state="loading" />
@@ -187,7 +225,7 @@ function HealthLogCard({
       {answered ? (
         <View style={[styles.answerBox, { backgroundColor: option?.bg || colors.surface2, borderColor: option?.color || colors.border }]}>
           <Text style={[styles.answerLabel, { color: option?.color || colors.text }]}>
-            {option?.label || ANSWER_LABEL[item.answer as HealthAnswer]}
+            {option?.label || WELLNESS_ANSWER_LABELS[item.answer as HealthAnswer]}
           </Text>
           {item.answerNote ? <Text style={styles.answerNote}>{item.answerNote}</Text> : null}
           {item.answeredAt ? (

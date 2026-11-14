@@ -8,7 +8,7 @@ export const BUOI_LABEL: Record<Buoi, string> = {
 };
 
 /** 00:00–09:59 sáng, 10:00–13:59 trưa, 14:00–17:59 chiều, 18:00–23:59 tối (khớp web). */
-export function buoiOfTime(time: string): Buoi {
+function buoiOfTime(time: string): Buoi {
   const hour = Number(time.slice(0, 2));
   if (hour < 10) return 'sang';
   if (hour < 14) return 'trua';

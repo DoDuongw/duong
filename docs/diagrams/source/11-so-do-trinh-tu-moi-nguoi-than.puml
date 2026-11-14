@@ -1,0 +1,52 @@
+@startuml
+title Tạo mã mời và kết nối người thân
+autonumber
+actor "Chủ hồ sơ" as Owner
+actor "Người thân" as Relative
+participant "Màn hình family\n(mobile/)" as App
+participant "Express API" as API
+participant "familyRouter" as Family
+database "MongoDB" as DB
+
+Owner -> App : chọn "Tạo mã mời"
+App -> API : POST /api/v1/family/invites
+API -> Family : verify token + kiểm tra rate limit
+Family -> DB : đếm invite tạo trong 1 phút
+alt vượt 5 mã/phút
+  Family --> API : 429
+  API --> App : lỗi rate limit
+else hợp lệ
+  Family -> DB : revoke các invite pending cũ
+  Family -> Family : random 6 chữ số\nhash SHA-256
+  Family -> DB : tạo FamilyInvite\n(expires_at = now + 15 phút)
+  Family -> DB : ghi AuditLog action=create
+  DB --> Family : invite
+  Family --> API : code + expiresAt
+  API --> App : 201 mã hiển thị một lần
+  App --> Owner : chia sẻ mã cho người thân
+end
+
+Relative -> App : nhập mã 6 chữ số
+App -> API : POST /api/v1/family/invites/{code}/accept
+API -> Family : verify token + kiểm tra định dạng
+Family -> DB : tìm invite theo code_hash + status=pending
+alt không tồn tại / hết hạn / tự kết nối / đã kết nối
+  Family -> DB : đánh dấu expired nếu hết hạn
+  Family --> API : 400 / 404 / 409
+  API --> App : lỗi
+else mã hợp lệ
+  Family -> DB : tạo FamilyConnection active\n(view_schedule=true,\nmanage_medication=false,\nrelative_alerts=true)
+  Family -> DB : invite.status=accepted
+  Family -> DB : ghi AuditLog action=accept_invite
+  DB --> Family : connection
+  Family --> API : 201 connection + permissions
+  API --> App : kết nối thành công
+  App --> Relative : xem lịch hộ ở chế độ chỉ xem
+end
+
+note over Family,DB
+  Mã mời có hạn 15 phút; chỉ lưu hash SHA-256.
+  Mỗi chủ hồ sơ tối đa 5 mã/phút.
+  Chủ hồ sơ có thể đổi quyền hoặc ngắt kết nối bất kỳ lúc nào.
+end note
+@enduml

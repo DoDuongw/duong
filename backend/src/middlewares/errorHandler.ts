@@ -16,6 +16,18 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     });
     return;
   }
+  if ((err as { name?: string }).name === 'MulterError') {
+    const code = (err as { code?: string }).code;
+    const message =
+      code === 'LIMIT_FILE_SIZE'
+        ? 'Ảnh quá lớn (tối đa 8MB)'
+        : 'Không đọc được file ảnh tải lên';
+    res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message },
+    });
+    return;
+  }
   // JSON gửi lên không đọc được (body-parser) → 400 chứ không phải lỗi máy chủ
   if ((err as { type?: string }).type === 'entity.parse.failed') {
     res.status(400).json({
