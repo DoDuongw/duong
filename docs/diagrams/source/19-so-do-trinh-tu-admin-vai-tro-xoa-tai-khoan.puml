@@ -1,0 +1,64 @@
+@startuml
+title Trình tự admin đổi vai trò và xóa tài khoản
+autonumber
+actor "Admin" as Admin
+participant "Tab operations\n(admin/index)" as App
+participant "Express API" as API
+participant "authMiddleware" as Auth
+participant "requireAdminMiddleware" as AdminMW
+participant "adminService" as Service
+participant "Firebase Admin" as Firebase
+database "MongoDB" as DB
+
+== Đổi vai trò ==
+Admin -> App : chọn tài khoản + vai trò mới
+App -> API : PATCH /api/v1/admin/users/{id}/role\n{ role }
+API -> Auth : verifyIdToken + requireStaff
+Auth --> API : role admin
+API -> AdminMW : requireAdmin
+AdminMW --> API : hợp lệ
+API -> Service : setUserRole(adminId, targetId, role)
+Service -> DB : đọc user mục tiêu
+alt tự đổi vai trò chính mình
+  Service --> API : 400
+else vai trò không đổi
+  Service --> API : trả idempotent
+else hạ quyền admin hoạt động cuối cùng
+  Service -> DB : đếm admin active
+  Service --> API : 400
+else hợp lệ
+  Service -> DB : lưu role mới
+  Service -> DB : AuditLog admin_set_role\n{ admin_id, from, to }
+  Service --> API : { id, role }
+  API --> App : JSON
+  App --> Admin : cập nhật danh sách
+end
+
+== Xóa tài khoản ==
+Admin -> App : chọn "Xóa vĩnh viễn"
+App -> API : DELETE /api/v1/admin/users/{id}
+API -> Auth : verifyIdToken + requireStaff
+Auth --> API : role admin
+API -> AdminMW : requireAdmin
+AdminMW --> API : hợp lệ
+API -> Service : deleteUserPermanently(adminId, targetId, actorRole)
+Service -> DB : đọc user mục tiêu
+alt không phải role user / tự xóa
+  Service --> API : 400 / 403
+else hợp lệ
+  Service -> DB : xóa dose, lịch, thuốc, thiết bị,\ninvite, connection, notification log
+  Service -> DB : AuditLog admin_delete_user
+  Service -> Firebase : revoke refresh token + xóa user\n(best-effort)
+  Service -> DB : xóa User
+  Service --> API : { id, deleted: true }
+  API --> App : JSON
+  App --> Admin : xóa khỏi danh sách
+end
+
+note over API,Service
+  Manager gọi đổi vai trò/xóa tài khoản -> 403.
+  Route POST /admin/users/:id/reset-password luôn trả 403.
+  Không thể hạ quyền admin đang hoạt động cuối cùng.
+  Không thể tự đổi vai trò hoặc tự xóa chính mình.
+end note
+@enduml

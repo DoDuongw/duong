@@ -9,7 +9,7 @@ import { HealthLog } from '../models/HealthLog';
 import { getMessagingOrNull } from '../config/firebase';
 import { env } from '../config/env';
 import { addMinutes } from '../utils/time';
-import { MISSED_AFTER_MINUTES, OVERDUE_AFTER_MINUTES } from './doseService';
+import { MISSED_AFTER_MINUTES } from './doseService';
 
 /** Loại thông báo do server chủ động gửi (khớp `notification_logs.kind`). */
 type PushKind = 'scheduled_reminder' | 'overdue' | 'snooze' | 'relative_alert' | 'wellness_check';
@@ -58,7 +58,7 @@ export const DEFAULT_MAX_ATTEMPTS = 3;
 /** Backoff giữa các lần thử: 1s / 5s / 15s (NOTIFICATION_PLAN §4). */
 const RETRY_BACKOFF_MS = [1000, 5000, 15000];
 /** Cửa sổ gửi push trễ tối đa (phút) — tránh "dội" thông báo cũ khi server vừa bật lại. */
-const NOTIFY_WINDOW_MINUTES = OVERDUE_AFTER_MINUTES;
+const NOTIFY_WINDOW_MINUTES = 30;
 
 /**
  * Chỉ trạng thái `confirmed` là đã xác nhận uống thuốc → không báo người thân.

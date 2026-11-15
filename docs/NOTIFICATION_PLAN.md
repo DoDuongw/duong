@@ -39,7 +39,7 @@
 
 ### 3.3 Nhắc từ server khi quá giờ (FCM)
 
-- Backend phát hiện lần uống `overdue` (quá 30 phút) → gửi FCM Web Push `{ type: "dose_overdue", doseId }` tới mọi token active.
+- Backend phát hiện lần uống `overdue` (quá 15 phút) → gửi FCM Web Push `{ type: "dose_overdue", doseId }` tới mọi token active.
 - Trang đóng → Service Worker hiển thị; trang mở → hiện trong trang. Bấm → mở M02.
 - Chỉ gửi **một lần** mỗi lần uống (ghi `notification_logs.kind='scheduled_reminder'/'overdue'` để chống trùng).
 
@@ -48,7 +48,7 @@
 - **Ngưỡng (cập nhật 12/11/2026 — yêu cầu của người dùng)**: khi lần uống **chưa được xác nhận quá `RELATIVE_ALERT_AFTER_MINUTES` phút** (mặc định **10**) và connection có `permissions.relative_alerts=true` → push tới người thân: “Người thân X chưa uống thuốc Y lúc HH:mm” *(hàm `notifyRelativeAlert`)*.
 - **Mốc tính từ giờ đến hạn cuối cùng**: nếu lần uống đã “nhắc lại sau” thì mốc là `snoozed_until` (mốc được kéo dài), không tính lại từ giờ hẹn gốc — tránh báo người thân trong khi người già đang thao tác.
 - **Chỉ trạng thái `confirmed` là không gửi.** Mọi trạng thái khác — `pending`/`snoozed`/`overdue`/`missed`/`cannot_take` (không uống được, đang bận…) — đều báo người thân. Bấm “không thể uống” → gửi ngay (nếu chưa từng gửi cho lần uống đó). Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống tối đa một push.
-- Cửa sổ bù (server vừa bật lại): `RELATIVE_ALERT_AFTER_MINUTES + 30` phút. Lưới an toàn: nếu tới lúc chuyển `missed` (2 giờ) mà chưa từng gửi thì vẫn báo; cron cũng quét lại `cannot_take` trong cửa sổ để thử lại khi push tức thời lỗi.
+- Cửa sổ bù (server vừa bật lại): `RELATIVE_ALERT_AFTER_MINUTES + 30` phút. Lưới an toàn: nếu tới lúc chuyển `missed` (30 phút) mà chưa từng gửi thì vẫn báo; cron cũng quét lại `cannot_take` trong cửa sổ để thử lại khi push tức thời lỗi.
 - Số phút cấu hình ở `backend/.env` (`RELATIVE_ALERT_AFTER_MINUTES`, mặc định 10).
 - Chỉ gửi khi connection active và có quyền; payload chỉ gồm tên thuốc + tên chủ hồ sơ + giờ.
 

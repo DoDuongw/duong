@@ -35,6 +35,8 @@ else trạng thái không cho phép / không phải chủ hồ sơ
 end
 
 note over API,DB
+  Chỉ confirm được khi status còn pending/snoozed/overdue;
+  sau 30 phút cron chuyển missed và không confirm được nữa.
   Không có endpoint sửa/xóa confirmed_at hoặc trạng thái kết thúc.
   Sau 10 phút, cron gửi push hỏi thăm sức khỏe cho lần uống này.
 end note

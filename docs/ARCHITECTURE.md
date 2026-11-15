@@ -85,6 +85,26 @@ sequenceDiagram
     App->>App: mở /dose/:id hoặc /health-journal
 ```
 
+### 2.1 Hoạt động gửi push
+
+```mermaid
+flowchart TD
+    A[Cron mỗi phút] --> B[transitionOverdueAndMissed]
+    B --> B1[pending quá 15 phút → overdue]
+    B --> B2[pending/snoozed/overdue quá 30 phút → missed]
+    B1 --> C[processDueNotifications]
+    B2 --> C
+    C --> D{Còn dose cần xử lý?}
+    D -- Có --> E[Chọn payload]
+    E --> F[Tìm Device active + notifications_enabled]
+    F --> G{Có token?}
+    G -- Không --> H[Ghi NotificationLog failed] --> D
+    G -- Có --> I[Gửi push tối đa 3 lần]
+    I --> J[Đánh dấu token invalid nếu cần]
+    J --> K[Ghi NotificationLog + NotificationHistory] --> D
+    D -- Không --> Z[Kết thúc]
+```
+
 ## 3. Trách nhiệm từng lớp
 
 | Thành phần | Trách nhiệm |
@@ -95,7 +115,7 @@ sequenceDiagram
 | Backend | Xác minh Firebase ID token, kiểm tra tài khoản bị khóa, phân quyền chủ hồ sơ/người thân/manager/admin, validate dữ liệu, xử lý nghiệp vụ và trả JSON thống nhất. |
 | `authMiddleware` + `familyAccess` | Gắn `userId`/`role`/`timezone`; `resolveOwnerAccess` kiểm tra `?ownerId=` và quyền `view_schedule` / `manage_medication`. |
 | Services | `doseService`: sinh lần uống, chuyển trạng thái, confirm/snooze/cannot-take. `notificationService`: chọn payload, gửi push, chống trùng, ghi lịch sử. `adminService`: dashboard, khóa/mở, đổi vai trò, xóa tài khoản. |
-| `node-cron` | Mỗi phút chuyển `pending → overdue` sau 30 phút và `→ missed` sau 120 phút; gửi push đến hạn, quá giờ, cảnh báo người thân và hỏi thăm sức khỏe. Mỗi ngày 00:00 sinh lần uống cho 7 ngày tới. |
+| `node-cron` | Mỗi phút chuyển `pending → overdue` sau 15 phút và `→ missed` sau 30 phút; gửi push đến hạn, quá giờ, cảnh báo người thân và hỏi thăm sức khỏe. Mỗi ngày 00:00 sinh lần uống cho 7 ngày tới. |
 | `Firebase Admin SDK` | Xác minh ID token, khóa/mở tài khoản Firebase, thu hồi refresh token, xóa user; gửi FCM. |
 | `Firebase Authentication` | Quản lý danh tính email/mật khẩu; backend không lưu mật khẩu. |
 | MongoDB + Mongoose | Lưu 12 collection nghiệp vụ; thời gian lưu UTC, hiển thị theo múi giờ người dùng. |

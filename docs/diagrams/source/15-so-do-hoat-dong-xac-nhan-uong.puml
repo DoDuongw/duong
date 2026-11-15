@@ -1,0 +1,48 @@
+@startuml
+title Hoạt động xác nhận đã uống thuốc
+skinparam shadowing false
+
+start
+:Mở lần uống từ Trang chủ / Lịch / push;
+if (Người dùng là chủ hồ sơ?) then (không)
+  :Chỉ xem; ẩn nút thao tác;
+  stop
+endif
+if (Trạng thái là pending / snoozed / overdue?) then (không)
+  :Hiển thị lần uống đã kết thúc;
+  stop
+endif
+:Chọn "Đã uống";
+:Tạo clientRequestId;
+:Gửi POST /api/v1/doses/{id}/confirm;
+:authMiddleware xác minh token\nvà kiểm tra tài khoản bị khóa;
+:doseService.findOneAndUpdate\n{ _id, user_id, status in [pending,snoozed,overdue] };
+if (Cập nhật thành công?) then (có)
+  if (now > scheduled_at\nvà cùng ngày địa phương?) then (có)
+    :Đặt is_late_confirmation = true;
+  else (không)
+    :Giữ is_late_confirmation = false;
+  endif
+  :Ghi AuditLog action=confirm;
+  :Trả JSON dose confirmed;
+  :Cập nhật trạng thái + tiến độ hôm nay;
+  :Cron gửi hỏi thăm sức khỏe sau 10 phút;
+else (không)
+  if (Cùng clientRequestId?) then (có)
+    :Trả kết quả idempotent;
+    :Cập nhật trạng thái + tiến độ hôm nay;
+  else (không)
+    :Trả 403 / 404 / 409;
+    :Hiển thị thông báo lỗi;
+  endif
+endif
+stop
+
+note right
+  Chỉ chủ hồ sơ được xác nhận.
+  Người thân có view_schedule chỉ xem (canAct=false).
+  Chỉ confirm được khi status còn pending/snoozed/overdue;
+  sau 30 phút cron chuyển missed và không confirm được nữa.
+  Không có API sửa/xóa confirmed_at sau khi đã xác nhận.
+end note
+@enduml

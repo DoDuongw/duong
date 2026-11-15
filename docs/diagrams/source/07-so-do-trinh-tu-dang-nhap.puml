@@ -40,5 +40,6 @@ note over API,DB
   Mọi API dưới /api/v1 đều đi qua authMiddleware.
   Tài khoản có disabled_at bị chặn bằng 403.
   Email xác minh được đồng bộ từ Firebase khi có token.
+  Quên/đặt lại mật khẩu: xem sơ đồ 17.
 end note
 @enduml

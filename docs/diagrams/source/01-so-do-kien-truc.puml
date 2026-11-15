@@ -53,7 +53,8 @@ Push --> NativePush
 Push --> SW
 
 note right of Cron
-  Mỗi phút: chuyển overdue/missed và gửi push.
+  Mỗi phút: pending -> overdue sau 15 phút;
+  pending/snoozed/overdue -> missed sau 30 phút.
   Mỗi ngày 00:00: sinh lần uống cho 7 ngày tới.
   Chỉ chạy khi ENABLE_CRON=true.
 end note

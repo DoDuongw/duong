@@ -404,8 +404,8 @@ Mặc định quyền: `view_schedule=true`, `manage_medication=false`, `relativ
 
 - `scheduled_at`, `confirmed_at`, `snoozed_until`, `asked_at`, `sent_at` lưu UTC.
 - Ngày nghiệp vụ (`start_date`, `effective_from`, `effective_to`) là chuỗi `YYYY-MM-DD` theo múi giờ chủ hồ sơ.
-- Lần uống quá 30 phút → `overdue`; quá 120 phút → `missed` (cron mỗi phút).
-- Xác nhận muộn trong cùng ngày địa phương đặt `is_late_confirmation=true`.
+- Lần uống quá 15 phút → `overdue`; quá 30 phút → `missed` (cron mỗi phút).
+- Xác nhận muộn (`now > scheduled_at`, cùng ngày địa phương) đặt `is_late_confirmation=true`; thực tế chỉ confirm được trước khi cron chuyển `missed` sau 30 phút.
 - Hỏi thăm sức khỏe được tạo sau khi xác nhận 10 phút; mỗi lần uống chỉ có một `HealthLog`.
 - Ngắt kết nối người thân đặt `status='revoked'` và `revoked_at`; không xóa lịch sử.
 - Xóa tài khoản (admin) xóa dữ liệu liên quan trong MongoDB và Firebase user; thao tác được ghi audit.

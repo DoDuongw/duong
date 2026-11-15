@@ -1,9 +1,10 @@
 # Bộ sơ đồ MedReminder
 
-Tất cả file PlantUML nằm trong `source/` và được đặt tên theo **số thứ tự + loại sơ đồ** để dễ nhận biết.
+19 file PlantUML nằm trong `source/` và được đặt tên theo **số thứ tự + loại sơ đồ** để dễ nhận biết.
 
 - `so-do-kien-truc`, `so-do-chuc-nang`, `so-do-dieu-huong`, `so-do-du-lieu-erd`: sơ đồ cấu trúc/nền tảng.
 - `so-do-trang-thai-...`: sơ đồ trạng thái (state machine).
+- `so-do-hoat-dong-...`: sơ đồ hoạt động (activity diagram).
 - `so-do-trinh-tu-...`: sơ đồ trình tự (sequence diagram).
 - `danh-muc-api`: danh mục endpoint, không phải sơ đồ luồng.
 
@@ -25,13 +26,18 @@ Tất cả file PlantUML nằm trong `source/` và được đặt tên theo **s
 | 12 | `source/12-so-do-trinh-tu-canh-bao-nguoi-than.puml` | Sequence | Cảnh báo người thân khi lần uống chưa xác nhận hoặc `cannot_take` |
 | 13 | `source/13-so-do-trinh-tu-hoi-tham-suc-khoe.puml` | Sequence | Push hỏi thăm sức khỏe 10 phút sau khi xác nhận và lưu câu trả lời |
 | 14 | `source/14-so-do-trinh-tu-admin-khoa-tai-khoan.puml` | Sequence | Khóa/mở tài khoản qua khu vận hành |
+| 15 | `source/15-so-do-hoat-dong-xac-nhan-uong.puml` | Activity | Luồng xác nhận đã uống, kiểm tra trạng thái, idempotency và ghi audit |
+| 16 | `source/16-so-do-hoat-dong-gui-push.puml` | Activity | Cron chuyển trạng thái, chọn payload, gửi push và ghi log |
+| 17 | `source/17-so-do-trinh-tu-quen-mat-khau.puml` | Sequence | Quên/đặt lại mật khẩu qua Firebase; nhánh tài khoản SĐT nội bộ |
+| 18 | `source/18-so-do-trinh-tu-quyen-nguoi-than.puml` | Sequence | Đổi quyền và ngắt kết nối người thân |
+| 19 | `source/19-so-do-trinh-tu-admin-vai-tro-xoa-tai-khoan.puml` | Sequence | Admin đổi vai trò và xóa vĩnh viễn tài khoản `user` |
 
-Hiện bộ sơ đồ **không có activity diagram riêng**. Các luồng hoạt động được mô tả bằng:
+Bộ sơ đồ hiện có **2 activity diagram**:
 
-- **Sequence diagram**: các file `07`–`14`.
+- **Activity**: file `15` cho xác nhận uống, file `16` cho gửi push.
+- **Sequence**: các file `07`–`14`, `17`–`19`.
 - **State machine**: file `05` cho vòng đời lần uống.
-
-Nếu cần activity diagram cho một luồng cụ thể (ví dụ xác nhận uống hoặc gửi push), có thể bổ sung sau.
+- **Use case**: file `02` cho tác nhân và chức năng.
 
 ## Tạo và xem sơ đồ (PowerShell)
 

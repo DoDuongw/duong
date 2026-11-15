@@ -95,12 +95,12 @@ export default function SettingsScreen() {
   async function saveNotificationSettings() {
     const sm = parseInt(snoozeMinutes, 10);
     const sx = parseInt(snoozeMax, 10);
-    if (!Number.isFinite(sm) || sm < 1 || sm > 120) {
-      Alert.alert('Giá trị không hợp lệ', 'Số phút hoãn nên từ 1 đến 120.');
+    if (!Number.isFinite(sm) || sm < 5 || sm > 30) {
+      Alert.alert('Giá trị không hợp lệ', 'Số phút hoãn nên từ 5 đến 30.');
       return;
     }
-    if (!Number.isFinite(sx) || sx < 0 || sx > 10) {
-      Alert.alert('Giá trị không hợp lệ', 'Số lần hoãn tối đa nên từ 0 đến 10.');
+    if (!Number.isFinite(sx) || sx < 1 || sx > 5) {
+      Alert.alert('Giá trị không hợp lệ', 'Số lần hoãn tối đa nên từ 1 đến 5.');
       return;
     }
     try {
@@ -331,7 +331,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Cài đặt nhắc lại" icon="🔁">
-          <Text style={styles.muted}>Áp dụng cho các lần uống tiếp theo. Mặc định: 10 phút × 3 lần.</Text>
+          <Text style={styles.muted}>Áp dụng cho các lần uống tiếp theo. Mặc định: 10 phút × 3 lần (5–30 phút, 1–5 lần; tổng không quá 30 phút).</Text>
           <Text style={styles.label}>Nhắc lại sau (phút)</Text>
           <Input value={snoozeMinutes} onChangeText={setSnoozeMinutes} keyboardType="number-pad" placeholder="10" />
           <Text style={styles.label}>Số lần nhắc lại tối đa</Text>

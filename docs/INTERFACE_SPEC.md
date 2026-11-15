@@ -118,11 +118,11 @@ Khu vực hậu trường cho tài khoản `role='manager'` hoặc `'admin'`, gi
 
 | Hạng mục | Nội dung |
 |---|---|
-| Mục tiêu | Theo dõi hoạt động hệ thống, khóa/mở tài khoản; admin đặt lại mật khẩu và phân quyền cho người quên mật khẩu (đặc biệt tài khoản SĐT dùng email nội bộ) |
+| Mục tiêu | Theo dõi hoạt động hệ thống, khóa/mở tài khoản; admin đổi vai trò và xóa vĩnh viễn tài khoản người dùng. Không đặt lại mật khẩu hộ người dùng. |
 | Điều kiện vào | `profile.role='manager'` hoặc `'admin'`; người thường thấy thông báo “không có quyền” + link về trang chủ, **không gọi API vận hành**. Lối vào là **nút cố định ở đầu trang**: “Quản trị hệ thống” với admin, “Khu vận hành” với quản lý; hiện trên mọi màn hình ứng dụng (không nằm trong M08); nút tự ẩn khi đang ở `/admin` |
 | Thành phần | Thanh tiêu đề có **thời điểm cập nhật + nút “Tải lại”** và nút “← Về ứng dụng”; khối tổng quan 8 thẻ số liệu 24 giờ (người dùng, tài khoản khóa, thuốc đang dùng, liều, chưa xác nhận, kết nối người thân, thiết bị, lỗi gửi thông báo) có nhãn ngữ cảnh; bố cục **hai cột trên màn hình lớn** (danh sách người dùng bên trái, lỗi gửi thông báo + nhật ký bên phải), xếp dọc trên điện thoại; ô tìm theo tên/SĐT + “Xóa lọc”; danh sách người dùng dạng thẻ (avatar chữ cái, tên, SĐT, email, badge **Quản trị/Quản lý/Đang hoạt động/Đã khóa**, 4 số đếm, ngày tạo, múi giờ); phân trang; mục lỗi gửi thông báo; nhật ký thao tác |
-| Hành động | Manager: “Khóa tài khoản”/“Mở khóa tài khoản” với tài khoản **người dùng** → hộp thoại xác nhận. Admin: thêm “Đặt lại mật khẩu” (hộp thoại mật khẩu mới + nhập lại, ≥ 8 ký tự) và “Đổi vai trò” (chọn Người dùng/Quản lý/Quản trị); “Tải lại” tải lại số liệu, người dùng, lỗi gửi thông báo và nhật ký |
-| API | `GET /admin/summary`, `GET /admin/users`, `PATCH /admin/users/:id/status`, `GET /admin/notifications`, `GET /admin/audit-logs`; admin thêm `POST /admin/users/:id/reset-password`, `PATCH /admin/users/:id/role` |
+| Hành động | Manager: “Khóa tài khoản”/“Mở khóa tài khoản” với tài khoản **người dùng** → hộp thoại xác nhận. Admin: thêm “Đổi vai trò” (chọn Người dùng/Quản lý/Quản trị) và “Xóa tài khoản” (chỉ tài khoản `user`, nhập `XOA` để xác nhận); không có nút đặt lại mật khẩu. “Tải lại” tải lại số liệu, người dùng, lỗi gửi thông báo và nhật ký |
+| API | `GET /admin/summary`, `GET /admin/users`, `PATCH /admin/users/:id/status`, `GET /admin/notifications`, `GET /admin/audit-logs`; admin thêm `PATCH /admin/users/:id/role`, `DELETE /admin/users/:id`; `POST /admin/users/:id/reset-password` tồn tại nhưng luôn trả 403 |
 | Riêng tư | **Không hiển thị** tên thuốc, hướng dẫn, lý do không uống; không hiển thị token FCM hay `firebase_uid` |
 | Trạng thái | Đang tải / lỗi (có thông báo + tải lại khi thao tác) / rỗng (“Không tìm thấy người dùng phù hợp”, “Không có lỗi gửi thông báo”, “Chưa có thao tác nào”) |
 | Truy cập | Nút ≥ 56px, chữ chính ≥ 15–16px (nhãn phụ ≥ 14px) cho bảng vận hành; hộp thoại `role="dialog"` + `aria-modal="true"`, đóng bằng nút ✕/Hủy; nhãn `aria-label` riêng cho từng người dùng để tránh trùng tên nút |
@@ -144,4 +144,4 @@ Khu vực hậu trường cho tài khoản `role='manager'` hoặc `'admin'`, gi
 2. Danh sách hành động cần xác nhận (Q5).
 3. Hộp thoại lý do “Không thể uống” có sẵn một số lý do phổ biến + nhập tự do.
 4. Mục hướng dẫn quyền Notifications/PWA đặt trong M08.
-5. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: khu vực `/admin` là công cụ vận hành ngoài M01–M08 (không phải M09); manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đặt lại mật khẩu + đổi vai trò; không hiển thị nội dung y tế chi tiết.
+5. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: khu vực `/admin` là công cụ vận hành ngoài M01–M08 (không phải M09); manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đổi vai trò và xóa vĩnh viễn tài khoản `user`; không hiển thị nội dung y tế chi tiết. Không đặt lại mật khẩu hộ người dùng.

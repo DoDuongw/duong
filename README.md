@@ -79,8 +79,8 @@ Các mốc mặc định:
 
 | Quy tắc | Giá trị |
 |---|---|
-| Quá giờ | 30 phút |
-| Bỏ lỡ | 120 phút |
+| Quá giờ | 15 phút |
+| Bỏ lỡ | 30 phút |
 | Cảnh báo người thân | 10 phút |
 | Hỏi thăm sức khỏe | 10 phút sau khi xác nhận |
 | Sinh trước lần uống | 7 ngày |
@@ -261,7 +261,7 @@ Backend hiện **không còn bộ test tự động** sau khi tinh gọn dự á
 | `docs/BUSINESS_RULES.md` | Quy tắc nghiệp vụ |
 | `docs/NOTIFICATION_PLAN.md` | Kế hoạch thông báo |
 | `docs/INTERFACE_SPEC.md` | Đặc tả màn hình |
-| `docs/diagrams/README.md` | Danh mục sơ đồ PlantUML/Mermaid |
+| `docs/diagrams/README.md` | Danh mục 19 sơ đồ PlantUML/Mermaid (kiến trúc, use case, ERD, trạng thái, 2 activity, 11 sequence) |
 | `docs/OPEN_QUESTIONS.md` | Câu hỏi và quyết định cần duyệt |
 
 Sinh lại danh mục API:

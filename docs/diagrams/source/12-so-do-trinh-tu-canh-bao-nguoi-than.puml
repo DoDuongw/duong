@@ -46,6 +46,7 @@ end
 note over Cron,Service
   Ngưỡng mặc định RELATIVE_ALERT_AFTER_MINUTES=10.
   Mốc tính là scheduled_at, hoặc snoozed_until nếu đã nhắc lại.
+  Nếu mốc 10 phút vượt quá missed 30 phút, lưới an toàn missed vẫn báo.
   Chỉ confirmed là không báo; cannot_take báo ngay khi bấm.
   Mỗi dose + kind + người nhận chỉ gửi thành công một lần.
 end note

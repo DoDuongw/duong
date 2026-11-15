@@ -9,9 +9,9 @@ import { addMinutes, isSameLocalDay, isSameLocalDayAs, localDateTimeToUtc } from
 import { env } from '../config/env';
 import { SNOOZE_MAX_DEFAULT, readSnoozeSettings } from '../utils/preferences';
 
-export const OVERDUE_AFTER_MINUTES = 30;
+export const OVERDUE_AFTER_MINUTES = 15;
 export const SNOOZE_MAX = SNOOZE_MAX_DEFAULT;
-export const MISSED_AFTER_MINUTES = 120;
+export const MISSED_AFTER_MINUTES = 30;
 
 const CONFIRMABLE: DoseStatus[] = ['pending', 'snoozed', 'overdue'];
 const SNOOZABLE: DoseStatus[] = ['pending', 'snoozed', 'overdue'];

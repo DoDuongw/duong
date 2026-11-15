@@ -26,7 +26,7 @@
 | 404 | NOT_FOUND | Không tìm thấy tài nguyên |
 | 409 | CONFLICT | Xung đột (trùng xác nhận, trạng thái không cho phép) |
 | 429 | RATE_LIMITED | Quá số yêu cầu (mã mời, đăng nhập) |
-| 503 | SERVICE_UNAVAILABLE | Firebase Admin chưa cấu hình/chưa kết nối được (khóa tài khoản, đặt lại mật khẩu) |
+| 503 | SERVICE_UNAVAILABLE | Firebase Admin chưa cấu hình/chưa kết nối được (khóa/mở tài khoản) |
 | 500 | INTERNAL_ERROR | Lỗi server |
 
 ### Phân quyền
@@ -36,7 +36,7 @@
 | Chủ hồ sơ | Token UID khớp `user_id` của tài nguyên |
 | Người thân | UID có `family_connections` active với owner và `permissions.view_schedule=true` (xem) hoặc `manage_medication=true` (sửa — mở rộng) |
 | Quản lý vận hành | `users.role = 'manager'` — xem số liệu/danh sách, khóa/mở tài khoản người dùng; **không** đặt lại mật khẩu, không đổi vai trò, không đọc nội dung y tế chi tiết |
-| Quản trị hệ thống | `users.role = 'admin'` — toàn bộ khu vực `/api/v1/admin`, gồm đặt lại mật khẩu và đổi vai trò; không đọc nội dung y tế chi tiết |
+| Quản trị hệ thống | `users.role = 'admin'` — toàn bộ khu vực `/api/v1/admin`, gồm đổi vai trò và xóa vĩnh viễn tài khoản `user`; route đặt lại mật khẩu luôn trả 403; không đọc nội dung y tế chi tiết |
 
 ## 2. Bảng endpoint
 
@@ -112,15 +112,16 @@
 
 ### 2.9 Khu vực vận hành — `manager` và `admin`
 
-Khu vực hậu trường `/admin` (không phải màn hình M09). Mọi route dưới đây qua `requireAuthMiddleware` + `requireStaffMiddleware` (`manager` hoặc `admin`); người dùng thường nhận **403 FORBIDDEN**, chưa đăng nhập nhận **401 UNAUTHENTICATED**. Đặt lại mật khẩu và đổi vai trò qua thêm `requireAdminMiddleware` — `manager` gọi hai route này nhận **403**.
+Khu vực hậu trường `/admin`. Mọi route dưới đây qua `requireAuthMiddleware` + `requireStaffMiddleware` (`manager` hoặc `admin`); người dùng thường nhận **403 FORBIDDEN**, chưa đăng nhập nhận **401 UNAUTHENTICATED**. Đổi vai trò và xóa tài khoản qua thêm `requireAdminMiddleware` — `manager` gọi hai route này nhận **403**. Route đặt lại mật khẩu tồn tại nhưng luôn trả **403** vì lý do bảo mật.
 
 | Method | Path | Quyền | Input | Output |
 |---|---|---|---|---|
 | GET | /admin/summary | Manager/Admin | — | `{ users, disabledUsers, activeMedications, doses24h, confirmed24h, activeConnections, activeDevices, failedNotifications24h }` — chỉ số đếm; các số `24h` chỉ tính **24 giờ đã qua** (không gồm liều tương lai) |
 | GET | /admin/users | Manager/Admin | Query: `?q=&page=&pageSize=` (`pageSize` ≤ 50) | `{ items: [{ id, displayName, phone, email, role, disabled, timezone, createdAt, medicationsActive, doses7d, confirmed7d, devicesActive }], page, pageSize, total }`. `role`: `'user' \| 'manager' \| 'admin'`. Tìm theo tên/SĐT. **Không** trả tên thuốc, ghi chú, lý do không uống. `email` đọc một lần từ Firebase Admin (không lưu trong MongoDB); Firebase lỗi → `email = null`, trang vẫn hoạt động |
 | PATCH | /admin/users/:id/status | Manager/Admin | `{ disabled: boolean }` | Khóa/mở tài khoản: gọi Firebase `updateUser(uid, { disabled })`, thu hồi refresh token khi khóa, lưu `users.disabled_at`, ghi `audit_logs` (`admin_lock`/`admin_unlock`). Không thể tự khóa chính mình → 400. **Manager** chỉ thao tác được tài khoản `role='user'`; tài khoản `manager`/`admin` → 403 |
-| POST | /admin/users/:id/reset-password | Admin | `{ password }` (8–128 ký tự) | Đặt mật khẩu qua Firebase Admin (cần cho tài khoản SĐT dùng email nội bộ, không nhận được email đặt lại), thu hồi refresh token, ghi `audit_logs` (`admin_reset_password`). **Không** trả/ghi lại mật khẩu. Manager → 403 |
+| POST | /admin/users/:id/reset-password | Admin | — | **Luôn trả 403 FORBIDDEN** vì lý do bảo mật; quản trị viên không được đổi/đặt lại mật khẩu của người dùng. Người dùng tự đổi mật khẩu trong Hồ sơ/Cài đặt hoặc dùng “Quên mật khẩu” ở màn hình đăng nhập. Manager → 403 |
 | PATCH | /admin/users/:id/role | Admin | `{ role: 'user' \| 'manager' \| 'admin' }` | Đổi vai trò trong MongoDB; ghi `audit_logs` (`admin_set_role`, `details.from/to`). Không thể tự đổi vai trò của mình → 400; không thể hạ quyền admin đang hoạt động cuối cùng → 400. Manager → 403 |
+| DELETE | /admin/users/:id | Admin | — | Xóa vĩnh viễn tài khoản `role='user'`: xóa dose, lịch, thuốc, thiết bị, mã mời, kết nối, notification log; ghi `audit_logs` (`admin_delete_user`); thu hồi refresh token + xóa Firebase user (best-effort); xóa `users`. Không thể tự xóa mình hoặc xóa tài khoản manager/admin → 400. Manager → 403 |
 | GET | /admin/notifications | Manager/Admin | Query: `?limit=` (≤ 100, mặc định 20) | Các `notification_logs` có `status='failed'`, mới nhất trước: `{ id, kind, channel, sentAt, error, errorCode, doseId }`; `error` là **nhãn tiếng Việt** để hiển thị, `errorCode` là mã gốc (`no_active_device`, `messaging/...`) để tra cứu |
 | GET | /admin/audit-logs | Manager/Admin | Query: `?limit=` (≤ 100, mặc định 20) | Nhật ký thao tác gần đây: `{ id, action, entity, entityId, actorName, actorPhone, createdAt, details }`. `actorName/actorPhone` là tên tài khoản bị tác động; `details.admin_id` là tài khoản đã thao tác; `details.admin_role` cho biết `manager`/`admin` (không trả mật khẩu) |
 
@@ -137,11 +138,16 @@ npm run role:set -- ban@example.com --role user        # hạ về người dùn
 
 Script tìm user qua Firebase (email) hoặc `users.phone` (SĐT) rồi đặt `role`. Không có endpoint tự cấp quyền. Không thể hạ quyền admin đang hoạt động cuối cùng.
 
-**Firebase Admin chưa cấu hình** → khóa/mở và đặt lại mật khẩu trả **503 SERVICE_UNAVAILABLE**; các route chỉ đọc vẫn chạy (trừ email = null).
+**Firebase Admin chưa cấu hình** → khóa/mở tài khoản trả **503 SERVICE_UNAVAILABLE**; các route chỉ đọc vẫn chạy (trừ email = null).
 
-### 2.10 Sức khỏe — KHÔNG triển khai
+### 2.10 Sức khỏe — nhật ký sau uống thuốc
 
-Theo phạm vi đã chốt (PROJECT_PLAN mục 4), nhóm API sức khỏe không được xây dựng ở phiên bản này. Nếu phạm vi đổi, bổ sung ở bản sửa đổi sau và cần duyệt lại.
+Chỉ chủ hồ sơ truy cập nhật ký của chính mình; không hỗ trợ `?ownerId=` cho người thân. Mỗi lần uống đã xác nhận có thể sinh một `health_logs` để hỏi cảm giác sau uống.
+
+| Method | Path | Quyền | Input | Output |
+|---|---|---|---|---|
+| GET | /health-logs | Chủ hồ sơ | Query: `?from=&to=&page=&pageSize=` (`from/to` dạng `YYYY-MM-DD`, `pageSize` ≤ 50) | `{ items: [{ id, doseId, medicationId, medicationName, kind, scheduledAt, confirmedAt, askedAt, question, answer, answerNote, answeredAt }], page, pageSize, total }` |
+| PATCH | /health-logs/:id | Chủ hồ sơ | `{ answer: 'good' \| 'tired' \| 'dizzy' \| 'unwell' \| 'other', note?: string (≤ 500) }` | Cập nhật câu trả lời + `answered_at`; không tìm thấy log của mình → 404 |
 
 ## 3. Yêu cầu kỹ thuật
 
@@ -156,16 +162,152 @@ Theo phạm vi đã chốt (PROJECT_PLAN mục 4), nhóm API sức khỏe không
 
 8. **Xem hộ người thân (`?ownerId=`)**: các endpoint **đọc** (`GET /doses/today`, `GET /doses`, `GET /doses/:id`, `GET /medications`, `GET /medications/:id`, `GET /history`) nhận query tùy chọn `?ownerId=<id>`. Không truyền (hoặc trùng chính mình) → đọc dữ liệu của mình. Truyền id khác → yêu cầu kết nối `active` với quyền `view_schedule`, thiếu → **403**. Riêng `GET /doses/:id` không truyền `?ownerId=` thì **suy ra chủ hồ sơ từ chính lần uống** (cho phép người thân bấm từ notification mở thẳng M02). Các endpoint **ghi/sửa thuốc** cũng nhận `?ownerId=` nhưng đòi quyền `manage_medication` (MVP = false → 403); ghi lần uống (xác nhận/nhắc lại/không thể uống) chỉ dành cho chủ hồ sơ. Phản hồi đọc hộ gắn cờ `canAct=false` để giao diện **chỉ xem**.
 
-9. **Thông báo người thân (relative alert)**: chỉ **không gửi** khi lần uống đã `confirmed` (đã xác nhận uống thuốc). Mọi trạng thái còn lại — `pending`/`snoozed`/`overdue`/`missed`/`cannot_take` (không uống được, đang bận…) — đều báo cho người thân. Với lần uống chưa xác nhận quá `RELATIVE_ALERT_AFTER_MINUTES` phút (mặc định **10**, cấu hình ở `backend/.env`) server gửi push tới thiết bị của mọi người thân có kết nối `active` với `permissions.relative_alerts=true` (mặc định bật); mốc tính là giờ đến hạn **cuối cùng** (`snoozed_until` nếu đã “nhắc lại sau”). Khi chủ hồ sơ bấm “không thể uống”, server gửi ngay (nếu chưa từng gửi cảnh báo cho lần uống đó) và cron vẫn có lưới an toàn để thử lại. Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống tối đa một push; nếu tới lúc chuyển `missed` (2 giờ) mà chưa từng gửi thì vẫn báo. Đây là push phía server, không có endpoint riêng.
+9. **Thông báo người thân (relative alert)**: chỉ **không gửi** khi lần uống đã `confirmed` (đã xác nhận uống thuốc). Mọi trạng thái còn lại — `pending`/`snoozed`/`overdue`/`missed`/`cannot_take` (không uống được, đang bận…) — đều báo cho người thân. Với lần uống chưa xác nhận quá `RELATIVE_ALERT_AFTER_MINUTES` phút (mặc định **10**, cấu hình ở `backend/.env`) server gửi push tới thiết bị của mọi người thân có kết nối `active` với `permissions.relative_alerts=true` (mặc định bật); mốc tính là giờ đến hạn **cuối cùng** (`snoozed_until` nếu đã “nhắc lại sau”). Khi chủ hồ sơ bấm “không thể uống”, server gửi ngay (nếu chưa từng gửi cảnh báo cho lần uống đó) và cron vẫn có lưới an toàn để thử lại. Chống trùng theo `(dose_id, kind='relative_alert')` — mỗi lần uống tối đa một push; nếu tới lúc chuyển `missed` (30 phút) mà chưa từng gửi thì vẫn báo. Đây là push phía server, không có endpoint riêng.
 
-10. **Quản trị tối thiểu dữ liệu**: route vận hành **không** trả nội dung y tế (tên thuốc, hướng dẫn, lý do không uống) và **không** trả token FCM, `firebase_uid` của người khác. Mật khẩu mới do admin nhập chỉ chuyển tới Firebase, **không** lưu DB, không ghi log, không trả lại trong response. Mọi thao tác khóa/mở/đặt lại mật khẩu/đổi vai trò đều ghi `audit_logs` với `details.admin_id`.
+10. **Quản trị tối thiểu dữ liệu**: route vận hành **không** trả nội dung y tế (tên thuốc, hướng dẫn, lý do không uống) và **không** trả token FCM, `firebase_uid` của người khác. Quản trị viên **không** đặt lại mật khẩu hộ người dùng; route `reset-password` luôn trả 403. Mọi thao tác khóa/mở/đổi vai trò/xóa tài khoản đều ghi `audit_logs` với `details.admin_id`.
 
 ---
 
 ## Điểm cần duyệt
 
-1. Danh sách endpoint ở mục 2 (bao gồm nhóm vận hành 2.9; nhóm sức khỏe 2.10 loại bỏ).
+1. Danh sách endpoint ở mục 2 (bao gồm nhóm vận hành 2.9 và nhóm sức khỏe 2.10).
 2. Bắt buộc `clientRequestId` cho xác nhận (idempotency).
 3. Người thân chỉ có quyền xem ở MVP; `manage_medication` chỉ mở ở mở rộng.
 4. Rate limit mã mời 5 lần/phút.
-5. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: khu vực vận hành `/admin` ngoài M01–M08 — manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đặt lại mật khẩu + đổi vai trò. Thêm `users.role` (`user`/`manager`/`admin`) và `users.disabled_at`. **Không** có xóa tài khoản (chờ Q4 — chính sách lưu trữ/xóa dữ liệu).
+5. **Đã duyệt 20/10/2026, mở rộng 27/10/2026**: khu vực vận hành `/admin` ngoài M01–M08 — manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đổi vai trò và xóa vĩnh viễn tài khoản `user`. Thêm `users.role` (`user`/`manager`/`admin`) và `users.disabled_at`. Route đặt lại mật khẩu tồn tại nhưng luôn trả 403 vì lý do bảo mật.
+
+---
+
+## 4. Sơ đồ trình tự bổ sung
+
+### 4.1 Quên / đặt lại mật khẩu
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Người dùng
+    participant A as welcome (mobile/)
+    participant Auth as AuthProvider
+    participant F as Firebase Auth
+    participant M as Hộp thư email
+    U->>A: nhập email/SĐT, bấm Quên mật khẩu
+    A->>A: kiểm tra identifier không rỗng
+    A->>Auth: sendPasswordReset(identifier)
+    Auth->>Auth: toFirebaseEmail()
+    alt email nội bộ @med.local
+        Auth-->>A: lỗi phone-account-reset-not-allowed
+        A-->>U: không thể tự khôi phục qua email
+    else email thật
+        Auth->>F: sendPasswordResetEmail(email)
+        F->>M: gửi email đặt lại mật khẩu
+        F-->>Auth: thành công
+        Auth-->>A: thành công
+        A-->>U: kiểm tra hộp thư
+        U->>M: mở email, bấm liên kết
+        M->>F: mở trang đặt lại mật khẩu
+        U->>F: nhập mật khẩu mới
+        F-->>U: xác nhận đổi mật khẩu
+    end
+    Note over A,F: Backend không tham gia luồng này, route admin reset-password luôn trả 403.
+```
+
+### 4.2 Đổi quyền và ngắt kết nối người thân
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor O as Chủ hồ sơ
+    actor R as Người thân
+    participant A as family (mobile/)
+    participant API as Express API
+    participant Auth as authMiddleware
+    participant F as familyRouter
+    participant DB as MongoDB
+    O->>A: chọn kết nối, bật/tắt quyền
+    A->>API: PATCH /family/connections/{id}/permissions
+    API->>Auth: verifyIdToken
+    Auth-->>API: userId
+    API->>F: kiểm tra schema + quyền chủ hồ sơ
+    F->>DB: tìm FamilyConnection active
+    alt không tìm thấy / không phải chủ hồ sơ
+        F-->>API: 404 / 403
+        API-->>A: lỗi
+    else hợp lệ
+        F->>F: merge quyền cũ + quyền mới
+        F->>DB: lưu permissions + AuditLog update_permissions
+        DB-->>F: connection
+        F-->>API: { id, permissions }
+        API-->>A: JSON
+        A-->>O: cập nhật danh sách
+    end
+    Note over R,DB: Yêu cầu kế tiếp của người thân áp dụng quyền mới ngay.
+    O->>A: chọn Ngắt kết nối
+    A->>API: DELETE /family/connections/{id}
+    API->>Auth: verifyIdToken
+    Auth-->>API: userId
+    API->>F: tìm connection active
+    alt không phải một trong hai bên
+        F-->>API: 403
+        API-->>A: lỗi
+    else hợp lệ
+        F->>DB: status=revoked + AuditLog revoke
+        DB-->>F: connection revoked
+        F-->>API: { id, status: revoked }
+        API-->>A: JSON
+        A-->>O: ẩn kết nối
+    end
+    Note over API,DB: Không xóa lịch sử, connection giữ status=revoked.
+```
+
+### 4.3 Admin đổi vai trò và xóa tài khoản
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant UI as Tab operations (admin/index)
+    participant API as Express API
+    participant Auth as authMiddleware
+    participant MW as requireAdmin
+    participant S as adminService
+    participant F as Firebase Admin
+    participant DB as MongoDB
+    A->>UI: chọn tài khoản + vai trò mới
+    UI->>API: PATCH /admin/users/{id}/role
+    API->>Auth: verifyIdToken + requireStaff
+    Auth-->>API: role admin
+    API->>MW: requireAdmin
+    MW-->>API: hợp lệ
+    API->>S: setUserRole(adminId, targetId, role)
+    S->>DB: đọc user mục tiêu
+    alt tự đổi vai trò / admin hoạt động cuối cùng
+        S-->>API: 400
+        API-->>UI: lỗi
+    else hợp lệ
+        S->>DB: lưu role + AuditLog admin_set_role
+        S-->>API: { id, role }
+        API-->>UI: JSON
+        UI-->>A: cập nhật danh sách
+    end
+    A->>UI: chọn Xóa vĩnh viễn
+    UI->>API: DELETE /admin/users/{id}
+    API->>Auth: verifyIdToken + requireStaff
+    Auth-->>API: role admin
+    API->>MW: requireAdmin
+    MW-->>API: hợp lệ
+    API->>S: deleteUserPermanently(adminId, targetId, actorRole)
+    S->>DB: đọc user mục tiêu
+    alt không phải role user / tự xóa
+        S-->>API: 400 / 403
+        API-->>UI: lỗi
+    else hợp lệ
+        S->>DB: xóa dose, lịch, thuốc, thiết bị, invite, connection, notification log
+        S->>DB: AuditLog admin_delete_user
+        S->>F: revoke refresh token + xóa user (best-effort)
+        S->>DB: xóa User
+        S-->>API: { id, deleted: true }
+        API-->>UI: JSON
+        UI-->>A: xóa khỏi danh sách
+    end
+    Note over API,S: Manager gọi role/delete -> 403, reset-password luôn 403.
+```

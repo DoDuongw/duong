@@ -1,6 +1,6 @@
 # BUSINESS RULES — Logic nghiệp vụ và giá trị mặc định
 
-Các giá trị đánh dấu *(mặc định đề xuất)* cần người dùng duyệt (Q3, OPEN_QUESTIONS.md).
+Các giá trị mặc định đã chốt (Q3, OPEN_QUESTIONS.md).
 
 ## 1. Trạng thái lần uống
 
@@ -14,33 +14,56 @@ stateDiagram-v2
     pending --> cannot_take: không thể uống (bắt buộc lý do)
     snoozed --> cannot_take: không thể uống
     overdue --> cannot_take: không thể uống
-    pending --> overdue: cron: quá 30 phút
+    pending --> overdue: cron: quá 15 phút
     overdue --> confirmed: confirm muộn
     overdue --> snoozed: snooze
-    pending --> missed: cron: quá 120 phút
-    snoozed --> missed: cron: quá 120 phút
-    overdue --> missed: cron: quá 120 phút
+    pending --> missed: cron: quá 30 phút
+    snoozed --> missed: cron: quá 30 phút
+    overdue --> missed: cron: quá 30 phút
     confirmed --> [*]
     cannot_take --> [*]
     missed --> [*]
     note right of confirmed: cron gửi hỏi thăm sức khỏe sau 10 phút
 ```
 
+### Sơ đồ hoạt động xác nhận
+
+```mermaid
+flowchart TD
+    A[Mở lần uống] --> B{Là chủ hồ sơ?}
+    B -- Không --> B1[Chỉ xem, ẩn thao tác] --> Z[Kết thúc]
+    B -- Có --> C{Trạng thái pending/snoozed/overdue?}
+    C -- Không --> C1[Hiển thị đã kết thúc] --> Z
+    C -- Có --> D[Chọn Đã uống] --> E[Tạo clientRequestId] --> F[POST /doses/:id/confirm]
+    F --> G[authMiddleware xác minh token] --> H[findOneAndUpdate theo user_id + status]
+    H --> I{Cập nhật thành công?}
+    I -- Có --> J{now > scheduled_at và cùng ngày?}
+    J -- Có --> K[is_late_confirmation = true]
+    J -- Không --> L[is_late_confirmation = false]
+    K --> M[Ghi AuditLog confirm]
+    L --> M
+    M --> N[Trả JSON + cập nhật UI]
+    N --> O[Cron gửi hỏi thăm sau 10 phút] --> Z
+    I -- Không --> P{Cùng clientRequestId?}
+    P -- Có --> Q[Trả kết quả idempotent] --> N
+    P -- Không --> R[403/404/409] --> S[Hiển thị lỗi] --> Z
+```
+
 ### Điều kiện chuyển trạng thái
 
 | Từ | Đến | Điều kiện |
 |---|---|---|
-| pending | confirmed | Chủ hồ sơ gọi confirm; nếu `now > scheduled_at` và vẫn trong cùng ngày địa phương → `is_late_confirmation=true` |
-| pending | snoozed | Gọi snooze; `snooze_count < snoozeMax`; giờ nhắc lại cùng ngày và không vượt `scheduled_at + 120 phút` |
+| pending | confirmed | Chủ hồ sơ gọi confirm; nếu `now > scheduled_at` và cùng ngày địa phương → `is_late_confirmation=true`. Thực tế chỉ confirm được khi trạng thái còn `pending/snoozed/overdue`, tức trước khi cron chuyển `missed` sau 30 phút |
+| pending | snoozed | Gọi snooze; `snooze_count < snoozeMax`; giờ nhắc lại cùng ngày và không vượt `scheduled_at + 30 phút` |
 | snoozed | snoozed | Tiếp tục snooze trong cùng giới hạn |
-| overdue | snoozed | Được phép snooze nếu còn lượt và còn trong giới hạn ngày/120 phút |
+| overdue | snoozed | Được phép snooze nếu còn lượt và còn trong giới hạn ngày/30 phút |
 | pending/snoozed/overdue | cannot_take | Gọi cannot-take kèm lý do (bắt buộc, 1–500 ký tự) |
-| pending | overdue | node-cron: quá 30 phút kể từ `scheduled_at` mà chưa xác nhận |
-| overdue | confirmed | Xác nhận muộn; set `is_late_confirmation=true` nếu cùng ngày địa phương |
-| pending/snoozed/overdue | missed | node-cron: quá 120 phút kể từ `scheduled_at` |
+| pending | overdue | node-cron: quá 15 phút kể từ `scheduled_at` mà chưa xác nhận |
+| overdue | confirmed | Xác nhận muộn; set `is_late_confirmation=true` nếu `now > scheduled_at` và cùng ngày địa phương |
+| pending/snoozed/overdue | missed | node-cron: quá 30 phút kể từ `scheduled_at` |
 | confirmed/cannot_take/missed | — | Trạng thái kết thúc, không chuyển tiếp |
 
-> Không có chuyển trực tiếp `snoozed → overdue`: cron chỉ chuyển `pending → overdue`, sau đó chuyển mọi trạng thái chưa kết thúc sang `missed` khi quá 120 phút.
+> Không có chuyển trực tiếp `snoozed → overdue`: cron chỉ chuyển `pending → overdue`, sau đó chuyển mọi trạng thái chưa kết thúc sang `missed` khi quá 30 phút.
 
 ### Quy tắc chống trùng
 
@@ -54,7 +77,7 @@ stateDiagram-v2
 |---|---|
 | Giới hạn | Mặc định cách nhau **10 phút**, tối đa **3 lần**. Người dùng có thể chỉnh ở M08 (`users.preferences.snoozeMinutes` 5–30, `snoozeMax` 1–5) — backend tuân theo; thiếu/sai → mặc định |
 | Không nhắc lại lần đã xác nhận | Snooze chỉ hợp lệ khi status ∈ {pending, snoozed, overdue} |
-| Vượt quá hạn trong ngày | Nếu giờ nhắc lại vượt quá 23:59 giờ địa phương hoặc vượt `scheduled_at + 2 giờ`, server từ chối với `409 CONFLICT` |
+| Vượt quá hạn trong ngày | Nếu giờ nhắc lại vượt quá 23:59 giờ địa phương hoặc vượt `scheduled_at + 30 phút`, server từ chối với `409 CONFLICT` |
 | Thông báo | Mỗi lần snooze → server gửi push mới sau `snoozeMinutes`; push cũ không gửi lại |
 
 ## 3. Thay đổi lịch uống
@@ -121,8 +144,8 @@ stateDiagram-v2
 
 ## Điểm cần duyệt
 
-1. Bảng giá trị mặc định: quá giờ 30 phút, snooze 10 phút × 3 lần, missed sau 2 giờ.
-2. Xác nhận muộn trong cùng ngày được đánh dấu `is_late_confirmation`.
+1. Bảng giá trị mặc định: quá giờ 15 phút, snooze 10 phút × 3 lần, missed sau 30 phút.
+2. Xác nhận muộn (`now > scheduled_at`, cùng ngày địa phương) được đánh dấu `is_late_confirmation`; thực tế chỉ confirm được trước khi cron chuyển `missed` sau 30 phút.
 3. Sinh trước 7 ngày các lần uống.
 4. Quy tắc đổi lịch: không sửa lịch sử, sinh lại lần uống tương lai theo phiên bản mới.
 5. Mã mời 6 chữ số, hạn 15 phút, mỗi lần tạo thì mã cũ vô hiệu.

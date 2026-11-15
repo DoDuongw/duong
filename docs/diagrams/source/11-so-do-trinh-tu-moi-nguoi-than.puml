@@ -47,6 +47,6 @@ end
 note over Family,DB
   Mã mời có hạn 15 phút; chỉ lưu hash SHA-256.
   Mỗi chủ hồ sơ tối đa 5 mã/phút.
-  Chủ hồ sơ có thể đổi quyền hoặc ngắt kết nối bất kỳ lúc nào.
+  Đổi quyền/ngắt kết nối: xem sơ đồ 18.
 end note
 @enduml

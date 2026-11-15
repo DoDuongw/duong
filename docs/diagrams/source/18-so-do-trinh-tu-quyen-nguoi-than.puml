@@ -1,0 +1,65 @@
+@startuml
+title Trình tự đổi quyền và ngắt kết nối người thân
+autonumber
+actor "Chủ hồ sơ" as Owner
+actor "Người thân" as Relative
+participant "family\n(mobile/)" as App
+participant "Express API" as API
+participant "authMiddleware" as Auth
+participant "familyRouter" as Family
+database "MongoDB" as DB
+
+== Đổi quyền ==
+Owner -> App : chọn kết nối, bật/tắt quyền
+App -> API : PATCH /api/v1/family/connections/{id}/permissions\n{ viewSchedule?, manageMedication?, relativeAlerts? }
+API -> Auth : verifyIdToken
+Auth --> API : userId
+API -> Family : kiểm tra schema + quyền chủ hồ sơ
+Family -> DB : tìm FamilyConnection active
+alt không tìm thấy / không phải chủ hồ sơ
+  Family --> API : 404 / 403
+  API --> App : lỗi
+else hợp lệ
+  Family -> Family : merge quyền cũ + quyền mới
+  Family -> DB : lưu permissions
+  Family -> DB : ghi AuditLog update_permissions
+  DB --> Family : connection
+  Family --> API : { id, permissions }
+  API --> App : JSON
+  App --> Owner : cập nhật danh sách
+end
+note over Relative,DB
+  Yêu cầu kế tiếp của người thân áp dụng quyền mới ngay.
+  view_schedule=false chặn đọc lịch/thuốc/lịch sử.
+  relative_alerts=false chặn push cảnh báo.
+end note
+
+== Ngắt kết nối ==
+Owner -> App : chọn "Ngắt kết nối"
+App -> API : DELETE /api/v1/family/connections/{id}
+API -> Auth : verifyIdToken
+Auth --> API : userId
+API -> Family : tìm connection active
+alt không phải một trong hai bên
+  Family --> API : 403
+  API --> App : lỗi
+else hợp lệ
+  Family -> DB : status=revoked, revoked_at=now
+  Family -> DB : ghi AuditLog revoke
+  DB --> Family : connection revoked
+  Family --> API : { id, status: revoked }
+  API --> App : JSON
+  App --> Owner : ẩn kết nối
+end
+note over Relative,DB
+  Chủ hồ sơ hoặc người thân đều có thể ngắt kết nối.
+  Không xóa lịch sử; connection giữ status=revoked.
+  Mọi yêu cầu ?ownerId= sau đó bị từ chối.
+end note
+
+note over API,DB
+  Chỉ chủ hồ sơ được đổi quyền.
+  Mặc định khi chấp nhận mã mời:
+  view_schedule=true, manage_medication=false, relative_alerts=true.
+end note
+@enduml

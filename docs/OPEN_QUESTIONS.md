@@ -6,7 +6,7 @@ Mọi mục dưới đây cần người dùng trả lời trước (hoặc tron
 |---|---|---|---|---|
 | Q1 | Firebase plan: người dùng dùng Spark (miễn phí) → Phone/OTP SMS không khả dụng. Đã chuyển sang Email/Mật khẩu. Xác nhận? | Giai đoạn 2 (xác thực) | Dùng Email/Mật khẩu trên Spark | Chờ xác nhận |
 | Q2 | iOS/PWA: có thiết bị iPhone/iPad để kiểm thử Web Push qua “Thêm vào màn hình chính” không? | Giai đoạn 5, 8 | Nếu không: chỉ test Chrome/Edge + Android, ghi rõ giới hạn iOS trong README | Chờ duyệt |
-| Q3 | Giá trị mặc định nghiệp vụ: quá giờ sau 30 phút; nhắc lại cách 10 phút tối đa 3 lần; tự chuyển “bỏ qua” sau 2 giờ hoặc hết ngày; cho phép xác nhận muộn trong cùng ngày. | BUSINESS_RULES, backend, thông báo | Dùng đúng các giá trị trên | Chờ duyệt |
+| Q3 | Giá trị mặc định nghiệp vụ: quá giờ sau 15 phút; nhắc lại cách 10 phút tối đa 3 lần; tự chuyển “bỏ lỡ” sau 30 phút; chỉ xác nhận muộn trong cửa sổ 30 phút. | BUSINESS_RULES, backend, thông báo | Dùng đúng các giá trị trên | **Đã chốt 15/11/2026** |
 | Q4 | Chính sách lưu giữ và xóa dữ liệu: giữ lịch sử uống thuốc bao lâu? Khi người dùng xóa tài khoản thì xóa mềm hay cứng? | DATABASE_PLAN, backend, **/admin** | Giữ vô thời hạn đến khi người dùng xóa tài khoản; xóa cứng toàn bộ dữ liệu trong 30 ngày sau yêu cầu. **Chưa quyết → chưa có nút xóa tài khoản ở `/admin`** | Chờ duyệt |
 | Q5 | Phải xác nhận hành động quan trọng nào trên giao diện? (lưu lịch mới, đổi lịch đang hoạt động, ngắt kết nối người thân, ngừng thuốc) | INTERFACE_SPEC | Xác nhận cả 4 hành động trên | Chờ duyệt |
 | Q6 | Múi giờ hiển thị mặc định: Asia/Ho_Chi_Minh có đúng cho mọi người dùng không? | DATABASE_PLAN, backend | Đúng, cho phép người dùng đổi ở M08 | Chờ duyệt |
@@ -20,7 +20,7 @@ Mọi mục dưới đây cần người dùng trả lời trước (hoặc tron
 |---|---|---|
 | Q9 | Quy tắc snooze “không vượt quá 23:59 giờ địa phương” chưa được cài? | **Đã cài 20/10/2026** (`snoozeDenyReason`, trả `409` nếu giờ nhắc lại sang ngày địa phương kế tiếp); có test B8 |
 | Q10 | M05 khi SỬA thuốc: API đã duyệt không có cách thêm/xóa một giờ trong lịch? | **Đã bổ sung 20/10/2026 theo duyệt của người dùng**: thêm `POST /medications/:id/schedules` và `DELETE /medications/schedules/:id` để sửa đầy đủ (đây là việc ngoài kế hoạch Giai đoạn 4, có test; xem API_SPEC 2.3–2.4) |
-| Q12 | Có nên có giao diện quản trị? Nếu có thì làm gì? | **Đã chốt và triển khai 20/10/2026, mở rộng 27/10/2026**: khu vực `/admin` ngoài M01–M08 (không phải M09) — manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đặt lại mật khẩu + đổi vai trò; thêm `users.role` (`user`/`manager`/`admin`) + `users.disabled_at`. Không xóa tài khoản (Q4) |
+| Q12 | Có nên có giao diện quản trị? Nếu có thì làm gì? | **Đã chốt và triển khai 20/10/2026, mở rộng 27/10/2026**: khu vực `/admin` ngoài M01–M08 (không phải M09) — manager xem số liệu/danh sách + khóa/mở tài khoản người dùng; admin thêm đổi vai trò và xóa vĩnh viễn tài khoản `user`; route đặt lại mật khẩu luôn trả 403. Thêm `users.role` (`user`/`manager`/`admin`) + `users.disabled_at`. Không xóa tài khoản manager/admin |
 
 ## Các câu hỏi đã đóng
 
