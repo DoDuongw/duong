@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { File } from "expo-file-system";
 import { apiFetch } from "./api";
 import { API_BASE } from "../config";
 import { getIdToken } from "./firebase";
@@ -173,9 +174,24 @@ export function unregisterDevice(fcmToken: string): Promise<{ removed: boolean }
   return apiFetch("/users/devices/unregister", { method: "DELETE", body: { fcmToken } });
 }
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function imageMimeFromName(name: string): string {
+  const ext = (name.split(".").pop() || "jpg").toLowerCase();
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+  return "image/jpeg";
+}
+
 /**
  * Tải ảnh thuốc lên backend (lưu cục bộ), trả về URL công khai.
  * Không dùng Firebase Storage để tránh lỗi bucket/rules trên môi trường dev.
+ *
+ * Expo SDK 58 dùng fetch mới của Expo. Fetch này không nhận FormData part dạng
+ * `{ uri, name, type }` của React Native (lỗi "Unsupported FormDataPart
+ * implementation"), nên trên native ta đọc file bằng expo-file-system và gửi
+ * một Blob-like object có `bytes()`.
  */
 export async function uploadMedicationImage(localUri: string): Promise<string> {
   const form = new FormData();
@@ -183,14 +199,19 @@ export async function uploadMedicationImage(localUri: string): Promise<string> {
     const response = await fetch(localUri);
     if (!response.ok) throw new Error("Không đọc được file ảnh để tải lên.");
     const blob = await response.blob();
+    if (blob.size > MAX_IMAGE_BYTES) {
+      throw new Error("Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 8MB.");
+    }
     const ext = (blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
     form.append("file", blob, `medication.${ext}`);
   } else {
-    const name = localUri.split("/").pop()?.split("?")[0] || `medication-${Date.now()}.jpg`;
-    const ext = (name.split(".").pop() || "jpg").toLowerCase();
-    const mime =
-      ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/jpeg";
-    form.append("file", { uri: localUri, name, type: mime } as any);
+    const file = new File(localUri);
+    if (file.size > MAX_IMAGE_BYTES) {
+      throw new Error("Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 8MB.");
+    }
+    const name = file.name || `medication-${Date.now()}.jpg`;
+    const type = file.type || imageMimeFromName(name);
+    form.append("file", { name, type, bytes: () => file.bytes() } as any);
   }
 
   const token = await getIdToken();
@@ -241,6 +262,16 @@ export function getNotificationHistory(
   params: { page?: number; pageSize?: number } = {},
 ): Promise<NotificationHistoryPage> {
   return apiFetch<NotificationHistoryPage>(`/notifications${query({ ...params })}`);
+}
+
+export function sendTestPush(): Promise<{
+  sent: number;
+  failed: number;
+  total: number;
+  message: string;
+  errors?: Array<{ token: string; error: string }>;
+}> {
+  return apiFetch("/notifications/test", { method: "POST", body: {} });
 }
 
 export function createFamilyInvite(): Promise<FamilyInviteCreated> {

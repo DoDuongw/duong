@@ -17,6 +17,10 @@ import { env } from './config/env';
 export function createApp() {
   const app = express();
 
+  // Render/Railway/Vercel đặt backend sau proxy HTTPS. Cần trust proxy để
+  // req.protocol là https và URL ảnh upload trả về không bị mixed content.
+  app.set('trust proxy', 1);
+
   app.use(cors({ origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',') }));
   app.use(express.json({ limit: '1mb' }));
 

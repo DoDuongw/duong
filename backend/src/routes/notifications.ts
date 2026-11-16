@@ -3,6 +3,8 @@ import { NotificationHistory } from '../models/NotificationHistory';
 import { NotificationLog } from '../models/NotificationLog';
 import { DoseOccurrence } from '../models/DoseOccurrence';
 import { Medication } from '../models/Medication';
+import { Device } from '../models/Device';
+import { firebasePushSender } from '../services/notificationService';
 import { ok } from '../middlewares/errorHandler';
 import { currentUserId, currentTimezone, requireAuthMiddleware } from '../middlewares/auth';
 
@@ -153,6 +155,65 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const items = merged.slice((page - 1) * pageSize, page * pageSize);
 
     ok(res, { items, page, pageSize, total });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /notifications/test — gửi một push thử tới các thiết bị đang hoạt động
+ * của chính người dùng. Dùng để kiểm tra quyền/token Web Push hoặc app native.
+ */
+router.post('/test', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = currentUserId(req);
+    const devices = await Device.find({
+      user_id: userId,
+      status: 'active',
+      notifications_enabled: true,
+    }).lean();
+
+    if (!devices.length) {
+      ok(res, {
+        sent: 0,
+        failed: 0,
+        message: 'Chưa có thiết bị đăng ký nhận thông báo. Hãy bật thông báo trên thiết bị này trước.',
+      });
+      return;
+    }
+
+    const tag = `test-${Date.now()}`;
+    const title = 'Thông báo thử';
+    const body = 'Nếu bạn thấy thông báo này, push đã hoạt động trên thiết bị này.';
+    const results = await firebasePushSender(
+      devices.map((device) => device.fcm_token),
+      {
+        title,
+        body,
+        tag,
+        data: { type: 'test', title, body, tag, url: '/notifications' },
+      },
+    );
+
+    const invalidTokens = results.filter((result) => result.invalid).map((result) => result.token);
+    if (invalidTokens.length) {
+      await Device.updateMany({ fcm_token: { $in: invalidTokens } }, { status: 'invalid' });
+    }
+
+    const sent = results.filter((result) => result.ok).length;
+    const failed = results.length - sent;
+    ok(res, {
+      sent,
+      failed,
+      total: results.length,
+      message:
+        sent > 0
+          ? 'Đã gửi thông báo thử. Kiểm tra notification trên thiết bị.'
+          : 'Chưa gửi được thông báo. Kiểm tra quyền thông báo/token của thiết bị.',
+      errors: results
+        .filter((result) => !result.ok)
+        .map((result) => ({ token: result.token.slice(0, 16), error: result.error ?? 'unknown' })),
+    });
   } catch (e) {
     next(e);
   }

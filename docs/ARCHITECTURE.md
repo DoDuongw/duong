@@ -147,8 +147,7 @@ flowchart TD
 ```text
 backend/   src/config, middlewares, models, routes, services, jobs, utils, scripts
 mobile/    src/app (Expo Router), src/components, services, store, hooks, theme, types, utils, public/
-tools/     diagram-generator
-docs/      tài liệu dự án và sơ đồ
+docs/      tài liệu dự án
 ```
 
 ## 6. Giới hạn hiện tại

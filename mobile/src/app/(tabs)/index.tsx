@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
-import { View, StyleSheet, ScrollView, Alert, RefreshControl, TouchableOpacity, Image } from "react-native";
+import { View, StyleSheet, ScrollView, Alert, RefreshControl, TouchableOpacity, Image, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { Button, Section, Notice, Text } from "../../components";
 import { colors, spacing, typography, radius } from "../../theme";
 import { useAuth } from "../../hooks/useAuth";
 import { confirmDose, getTodayDoses, newClientRequestId } from "../../services/endpoints";
+import { enablePushNotifications, getCurrentPushToken } from "../../services/notifications";
 import type { DoseWithMedication, TodayDoses } from "../../types";
 import { buoiOfIso, formatTime } from "../../utils/dateTime";
 import { nextActionable } from "../../utils/doseStatus";
@@ -15,6 +16,10 @@ export default function HomeScreen() {
   const [data, setData] = useState<TodayDoses | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [acting, setActing] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushHint, setPushHint] = useState<string | null>(null);
+  const isWeb = Platform.OS === 'web';
 
   const load = useCallback(async () => {
     try {
@@ -27,11 +32,41 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const refreshPushState = useCallback(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const NotificationApi = (globalThis as any).Notification;
+    const permission = NotificationApi?.permission ?? 'default';
+    setPushEnabled(!!getCurrentPushToken() && permission === 'granted');
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load]),
+      refreshPushState();
+    }, [load, refreshPushState]),
   );
+
+  async function handleEnablePush() {
+    try {
+      setPushBusy(true);
+      const result = await enablePushNotifications({ requestPermission: true });
+      if (result.token) {
+        setPushEnabled(true);
+        setPushHint(null);
+        Alert.alert('Đã bật thông báo', 'Bạn sẽ nhận nhắc uống thuốc trên thiết bị này.');
+      } else {
+        setPushHint(result.message || 'Chưa bật được thông báo.');
+        Alert.alert(
+          'Chưa bật được thông báo',
+          result.message || 'Hãy kiểm tra quyền thông báo của trình duyệt rồi thử lại.',
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('Lỗi', e?.message || 'Không thể bật thông báo');
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   const doses: DoseWithMedication[] = data?.doses || [];
   const next = nextActionable(doses);
@@ -90,6 +125,24 @@ export default function HomeScreen() {
             <Text style={styles.progressHint}>{total === 0 ? 'Chưa có lịch uống thuốc hôm nay' : `Hoàn thành ${pct}%`}</Text>
           </View>
         </View>
+
+        {isWeb && !pushEnabled ? (
+          <View style={styles.pushCard}>
+            <Text style={styles.pushTitle}>🔔 Bật nhắc thuốc trên điện thoại</Text>
+            <Text style={styles.pushText}>
+              {pushHint ||
+                'Bấm bật và chọn “Cho phép” để nhận thông báo khi đóng tab. Trên iPhone: Thêm vào màn hình chính trước, rồi mở app từ icon mới.'}
+            </Text>
+            <Button
+              variant="secondary"
+              onPress={handleEnablePush}
+              loading={pushBusy}
+              disabled={pushBusy}
+            >
+              Bật thông báo
+            </Button>
+          </View>
+        ) : null}
 
         {next ? (
           <View style={styles.nowCard}>
@@ -190,6 +243,25 @@ const styles = StyleSheet.create({
   },
   greeting: {
     marginBottom: spacing.lg,
+  },
+  pushCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  pushTitle: {
+    ...typography.body,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  pushText: {
+    ...typography.body,
+    color: colors.muted,
+    marginBottom: spacing.md,
   },
   greetingTop: {
     flexDirection: 'row',

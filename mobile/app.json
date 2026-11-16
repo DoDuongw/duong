@@ -59,7 +59,6 @@
     ],
     "scheme": "medreminder",
     "extra": {
-      "API_BASE_URL": "http://192.168.100.23:3000/api/v1",
       "ALLOW_EMULATOR_PUSH": "true",
       "FIREBASE_API_KEY": "AIzaSyBlqzArvYUnI4IqRmL-1dtKjRaxYU6DARc",
       "FIREBASE_AUTH_DOMAIN": "medicationreminder-6177c.firebaseapp.com",

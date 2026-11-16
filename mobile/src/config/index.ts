@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>;
 
@@ -14,10 +15,26 @@ const envConfig: Record<string, string | undefined> = {
 };
 
 function readConfig(key: string): string {
-  const fromExtra = extra[key];
-  if (typeof fromExtra === "string" && fromExtra.trim()) return fromExtra.trim();
+  // Env thắng extra để build web/APK có thể trỏ tới backend public mà không
+  // phải sửa app.json. Nếu không có env thì mới dùng giá trị trong app.json.
   const fromEnv = envConfig[key];
-  return typeof fromEnv === "string" ? fromEnv.trim() : "";
+  if (typeof fromEnv === "string" && fromEnv.trim()) return fromEnv.trim();
+  const fromExtra = extra[key];
+  return typeof fromExtra === "string" ? fromExtra.trim() : "";
+}
+
+/**
+ * Khi chạy Expo web ở máy dev, backend thường nằm cùng host ở cổng 3000.
+ * Không dùng fallback này cho bản deploy: bản production phải có
+ * EXPO_PUBLIC_API_BASE_URL trỏ tới backend HTTPS public.
+ */
+function webDevApiBase(): string | null {
+  if (process.env.NODE_ENV === "production") return null;
+  if (typeof window === "undefined" || !window.location) return null;
+  if (window.location.protocol === "https:") return null;
+  const host = window.location.hostname;
+  if (!host || host === "0.0.0.0") return null;
+  return `http://${host}:3000/api/v1`;
 }
 
 function devLanApiBase(): string | null {
@@ -57,9 +74,9 @@ const isUsable = (v: string | null | undefined): v is string =>
 
 export const API_BASE: string =
   (isUsable(configuredApiBase) ? configuredApiBase : null) ||
+  webDevApiBase() ||
   devLanApiBase() ||
-  (isUsable(process.env.EXPO_PUBLIC_API_BASE_URL) ? process.env.EXPO_PUBLIC_API_BASE_URL!.trim() : null) ||
-  "http://10.0.2.2:3000/api/v1";
+  (Platform.OS === "android" ? "http://10.0.2.2:3000/api/v1" : "http://localhost:3000/api/v1");
 
 export const firebaseConfig = {
   apiKey: readConfig("FIREBASE_API_KEY"),

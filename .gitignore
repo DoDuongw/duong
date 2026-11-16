@@ -12,6 +12,9 @@ backend/uploads/
 *.apk
 *.aab
 
+# Temporary demo QR (URL changes when tunnel restarts)
+qr-web.png
+
 # Firebase service account — TUYỆT ĐỐI không commit
 *serviceAccountKey*.json
 *firebase-adminsdk*.json

@@ -9,6 +9,7 @@ import { colors, spacing, typography } from "../theme";
 import { API_BASE } from "../config";
 import {
   listFamilyConnections,
+  sendTestPush,
   updateFamilyPermissions,
   updateNotificationSettings,
 } from "../services/endpoints";
@@ -25,6 +26,7 @@ export default function SettingsScreen() {
   const [snoozeMax, setSnoozeMax] = useState(String(prefs.snoozeMax ?? 3));
   const [saving, setSaving] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [testPushBusy, setTestPushBusy] = useState(false);
   const [pushToken, setPushToken] = useState<string | null>(() => getCurrentPushToken());
   const [pushPlatform, setPushPlatform] = useState<'android' | 'ios' | 'web' | null>(() =>
     getCurrentPushToken() ? 'web' : null,
@@ -143,6 +145,29 @@ export default function SettingsScreen() {
       Alert.alert('Lỗi đăng ký thiết bị', e?.message || 'Không thể đăng ký thiết bị. Kiểm tra kết nối máy chủ (API_BASE) và thử lại.');
     } finally {
       setPushBusy(false);
+    }
+  }
+
+  async function handleSendTestPush() {
+    try {
+      setTestPushBusy(true);
+      const result = await sendTestPush();
+      if (result.sent > 0) {
+        Alert.alert(
+          'Đã gửi thông báo thử',
+          `${result.message}\n\nNếu không thấy notification: kiểm tra quyền thông báo của trang/app và chế độ không làm phiền.`,
+        );
+      } else {
+        Alert.alert(
+          'Chưa gửi được thông báo thử',
+          result.message ||
+            'Chưa có thiết bị đăng ký nhận thông báo. Hãy bật thông báo trên thiết bị này trước.',
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('Lỗi', e?.message || 'Không gửi được thông báo thử');
+    } finally {
+      setTestPushBusy(false);
     }
   }
 
@@ -358,9 +383,18 @@ export default function SettingsScreen() {
           </Button>
           <Text style={styles.hint}>
             {Platform.OS === 'web'
-              ? 'Web Push chỉ hoạt động trên localhost hoặc HTTPS. Trình duyệt sẽ hỏi quyền thông báo; hãy chọn “Cho phép”. Nếu tab hoặc trình duyệt bị đóng hoàn toàn, thông báo có thể không tới (tùy trình duyệt). Trên iPhone/iPad Safari cần “Thêm vào màn hình chính” (PWA).'
+              ? 'Web Push chỉ hoạt động trên localhost hoặc HTTPS. Trình duyệt sẽ hỏi quyền thông báo; hãy chọn “Cho phép”. Nếu tab hoặc trình duyệt bị đóng hoàn toàn, thông báo có thể không tới (tùy trình duyệt). Trên iPhone/iPad: mở bằng Safari → Chia sẻ → “Thêm vào màn hình chính”, rồi mở app từ icon mới và bật thông báo. Tab Safari thường sẽ báo unsupported-browser.'
               : 'Với Expo SDK 58, Expo Go không nhận được thông báo đẩy từ xa. Cần cài bản development/preview build (EAS) trên điện thoại thật. Sau khi cấp quyền, token phải bắt đầu bằng ExpoPushToken[...].'}
           </Text>
+          <Button
+            variant="ghost"
+            onPress={handleSendTestPush}
+            loading={testPushBusy}
+            disabled={testPushBusy}
+            style={styles.mt}
+          >
+            Gửi thử thông báo
+          </Button>
           {pushToken ? (
             <View style={styles.tokenBox}>
               <Text style={styles.label}>{isWebPush ? 'Token Web Push (đầy đủ)' : 'Token thiết bị (đầy đủ)'}</Text>

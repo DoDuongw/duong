@@ -119,8 +119,7 @@ backend/ (Node.js + Express + TypeScript)
 ```text
 backend/   API Express, MongoDB models, services, cron, scripts quản trị
 mobile/    Ứng dụng chính: Expo Router, screens, components, services, store
-docs/      Tài liệu kiến trúc, nghiệp vụ, API, dữ liệu và sơ đồ
-tools/     Script sinh danh mục API và render sơ đồ
+docs/      Tài liệu kiến trúc, nghiệp vụ, API và dữ liệu
 word/      Báo cáo và tài liệu Word
 ```
 
@@ -251,7 +250,7 @@ npx expo export --platform web
 
 Backend hiện **không còn bộ test tự động** sau khi tinh gọn dự án. Các thay đổi backend cần được kiểm tra bằng typecheck, build và test tay theo luồng nghiệp vụ.
 
-## 12. Tài liệu và sơ đồ
+## 12. Tài liệu
 
 | File | Nội dung |
 |---|---|
@@ -261,20 +260,7 @@ Backend hiện **không còn bộ test tự động** sau khi tinh gọn dự á
 | `docs/BUSINESS_RULES.md` | Quy tắc nghiệp vụ |
 | `docs/NOTIFICATION_PLAN.md` | Kế hoạch thông báo |
 | `docs/INTERFACE_SPEC.md` | Đặc tả màn hình |
-| `docs/diagrams/README.md` | Danh mục 19 sơ đồ PlantUML/Mermaid (kiến trúc, use case, ERD, trạng thái, 2 activity, 11 sequence) |
 | `docs/OPEN_QUESTIONS.md` | Câu hỏi và quyết định cần duyệt |
-
-Sinh lại danh mục API:
-
-```bash
-node tools/diagram-generator/generate.mjs
-```
-
-Render sơ đồ (cần Java + PlantUML CLI):
-
-```bash
-node tools/diagram-generator/generate.mjs render
-```
 
 Một số tài liệu cũ trong `docs/` có thể còn nhắc giai đoạn trước khi chuyển sang Expo. Khi có khác biệt, ưu tiên `README.md`, `docs/ARCHITECTURE.md`, `docs/BUSINESS_RULES.md` và `docs/DATABASE_PLAN.md`.
 

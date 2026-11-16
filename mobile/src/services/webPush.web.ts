@@ -40,6 +40,26 @@ function pushSupported(): boolean {
   );
 }
 
+function isIosDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isStandalonePwa(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia?.('(display-mode: standalone)').matches === true ||
+    (navigator as any).standalone === true
+  );
+}
+
+function iosPwaMessage(): string {
+  return 'Trên iPhone/iPad, Web Push chỉ hoạt động sau khi thêm app vào màn hình chính (iOS 16.4+). Mở bằng Safari → nút Chia sẻ → “Thêm vào màn hình chính”, rồi mở app từ icon mới và bật lại thông báo. Tab Safari thường sẽ báo unsupported-browser.';
+}
+
 function getMessagingInstance(): Messaging | null {
   if (messaging) return messaging;
   const app = getFirebaseApp();
@@ -147,11 +167,19 @@ export async function registerWebPush(
         'Chưa có VAPID key. Vào Firebase Console → Project settings → Cloud Messaging → Web Push certificates, rồi điền FIREBASE_VAPID_KEY trong mobile/app.json.',
     };
   }
+  // Safari trên iPhone/iPad chỉ có Push API khi web app đã được thêm vào màn
+  // hình chính (iOS 16.4+). Trong tab Safari thường, Firebase sẽ báo
+  // messaging/unsupported-browser; chặn trước để hiện hướng dẫn dễ hiểu.
+  if (isIosDevice() && !isStandalonePwa()) {
+    return { token: null, platform: 'web', message: iosPwaMessage() };
+  }
   if (!pushSupported()) {
     return {
       token: null,
       platform: 'web',
-      message: 'Trình duyệt này không hỗ trợ Web Push (cần Chrome/Edge/Firefox hoặc Safari 16.4+).',
+      message: isIosDevice()
+        ? 'iPhone/iPad này chưa hỗ trợ Web Push. Hãy dùng iOS 16.4+ và thêm app vào màn hình chính, hoặc dùng APK/TestFlight để nhận thông báo ổn định.'
+        : 'Trình duyệt này không hỗ trợ Web Push (cần Chrome/Edge/Firefox hoặc Safari 16.4+).',
     };
   }
   if (!window.isSecureContext) {
@@ -161,14 +189,9 @@ export async function registerWebPush(
       message: 'Web Push chỉ hoạt động trên localhost hoặc HTTPS. Hãy mở app qua http://localhost:8081.',
     };
   }
-  if (!(await isSupported().catch(() => false))) {
-    return {
-      token: null,
-      platform: 'web',
-      message: 'Trình duyệt này không hỗ trợ Firebase Messaging.',
-    };
-  }
-
+  // iOS/Safari yêu cầu Notification.requestPermission() phải nằm trong user
+  // gesture. Gọi trước mọi await (isSupported/registerServiceWorker) để không
+  // mất gesture và tránh lỗi permission-blocked trên PWA iOS 16.4+.
   let permission = Notification.permission;
   if (permission === 'default' && options.requestPermission !== false) {
     permission = await Notification.requestPermission();
@@ -181,6 +204,14 @@ export async function registerWebPush(
         permission === 'denied'
           ? 'Trình duyệt đang chặn thông báo. Bấm biểu tượng ổ khóa cạnh địa chỉ → Notifications → Allow, rồi thử lại.'
           : 'Bạn cần bấm nút này và chọn “Cho phép” khi trình duyệt hỏi quyền thông báo.',
+    };
+  }
+
+  if (!(await isSupported().catch(() => false))) {
+    return {
+      token: null,
+      platform: 'web',
+      message: 'Trình duyệt này không hỗ trợ Firebase Messaging.',
     };
   }
 
@@ -229,9 +260,14 @@ export async function registerWebPush(
   } catch (e: any) {
     console.warn('Không lấy được token Web Push:', e);
     const code = String(e?.code || '');
+    const rawMessage = String(e?.message || '');
     let message = 'Không lấy được mã nhận thông báo Web Push. Kiểm tra kết nối mạng và thử lại.';
     if (code.includes('permission')) {
       message = 'Trình duyệt đang chặn quyền thông báo. Hãy mở quyền cho trang này rồi thử lại.';
+    } else if (code.includes('unsupported-browser') || rawMessage.includes('unsupported-browser')) {
+      message = isIosDevice()
+        ? iosPwaMessage()
+        : 'Trình duyệt này không hỗ trợ Firebase Web Push. Hãy dùng Chrome/Edge/Firefox hoặc Safari 16.4+ (iPhone cần thêm vào màn hình chính).';
     } else if (code.includes('vapid')) {
       message = 'VAPID key không hợp lệ hoặc đã bị tạo lại. Kiểm tra FIREBASE_VAPID_KEY trong mobile/app.json.';
     } else if (code.includes('token-subscribe')) {
