@@ -26,6 +26,7 @@ import type {
   MedicationStatus,
   NotificationHistoryPage,
   TodayDoses,
+  UserHealthInfo,
   UserPreferences,
   UserProfile,
   UserRole,
@@ -57,6 +58,7 @@ export function syncProfile(input?: {
   address?: string;
   timezone?: string;
   dateOfBirth?: string;
+  healthInfo?: UserHealthInfo | null;
 }): Promise<UserProfile> {
   return apiFetch<UserProfile>("/users/me/sync", { method: "POST", body: input ?? {} });
 }
@@ -67,6 +69,7 @@ export function updateProfile(input: {
   address?: string | null;
   timezone?: string;
   dateOfBirth?: string;
+  healthInfo?: UserHealthInfo | null;
 }): Promise<UserProfile> {
   return apiFetch<UserProfile>("/users/me", { method: "PATCH", body: input });
 }

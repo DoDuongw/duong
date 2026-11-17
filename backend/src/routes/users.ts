@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { User, UserDoc } from '../models/User';
+import { User, UserDoc, UserHealthInfo } from '../models/User';
 import { Device } from '../models/Device';
 import { ok } from '../middlewares/errorHandler';
 import { requireAuthMiddleware, currentUserId, requireFirebaseAuthMiddleware } from '../middlewares/auth';
@@ -55,12 +55,32 @@ const addressField = z
     return trimmed;
   });
 
+const healthInfoSchema = z.object({
+  weightKg: z.number().min(1).max(500).nullable().optional(),
+  heightCm: z.number().min(30).max(250).nullable().optional(),
+  bloodPressure: z
+    .string()
+    .max(20)
+    .nullable()
+    .optional()
+    .refine(
+      (value) => !value || /^\d{2,3}\s*\/\s*\d{2,3}$/.test(value.trim()),
+      'Huyết áp không hợp lệ (ví dụ 120/80)',
+    ),
+  heartRate: z.number().int().min(20).max(250).nullable().optional(),
+  bloodSugar: z.number().min(0.5).max(50).nullable().optional(),
+  notes: z.string().max(500).nullable().optional(),
+});
+
+type HealthInfoInput = z.infer<typeof healthInfoSchema>;
+
 const profileSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   phone: phoneField.optional(),
   address: addressField.optional(),
   timezone: z.string().min(1).max(50).optional(),
   preferences: z.record(z.unknown()).optional(),
+  healthInfo: healthInfoSchema.optional(),
   dateOfBirth: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -77,6 +97,24 @@ const profileSchema = z.object({
 
 type ProfileInput = z.infer<typeof profileSchema>;
 
+function healthInfoUpdates(data: HealthInfoInput): Record<string, unknown> {
+  const hasValue = Object.values(data).some((value) => value !== undefined);
+  if (!hasValue) return {};
+  return { health_info: healthInfoCreate(data) };
+}
+
+function healthInfoCreate(data: HealthInfoInput): UserHealthInfo {
+  return {
+    weight_kg: data.weightKg ?? null,
+    height_cm: data.heightCm ?? null,
+    blood_pressure: data.bloodPressure?.replace(/\s+/g, '') || null,
+    heart_rate: data.heartRate ?? null,
+    blood_sugar: data.bloodSugar ?? null,
+    notes: data.notes?.trim() || null,
+    updated_at: new Date(),
+  };
+}
+
 function profileUpdates(data: ProfileInput): Record<string, unknown> {
   const updates: Record<string, unknown> = {};
   if (data.displayName !== undefined) updates.display_name = data.displayName;
@@ -84,6 +122,7 @@ function profileUpdates(data: ProfileInput): Record<string, unknown> {
   if (data.address !== undefined) updates.address = data.address;
   if (data.timezone !== undefined) updates.timezone = data.timezone;
   if (data.preferences !== undefined) updates.preferences = data.preferences;
+  if (data.healthInfo !== undefined) Object.assign(updates, healthInfoUpdates(data.healthInfo));
   if (data.dateOfBirth !== undefined) updates.date_of_birth = new Date(data.dateOfBirth);
   return updates;
 }
@@ -96,6 +135,19 @@ function userJson(user: UserDoc) {
     address: user.address,
     timezone: user.timezone,
     preferences: user.preferences,
+    healthInfo: user.health_info
+      ? {
+          weightKg: user.health_info.weight_kg ?? null,
+          heightCm: user.health_info.height_cm ?? null,
+          bloodPressure: user.health_info.blood_pressure ?? null,
+          heartRate: user.health_info.heart_rate ?? null,
+          bloodSugar: user.health_info.blood_sugar ?? null,
+          notes: user.health_info.notes ?? null,
+          updatedAt: user.health_info.updated_at
+            ? new Date(user.health_info.updated_at).toISOString()
+            : null,
+        }
+      : null,
     role: user.role ?? 'user',
     emailVerified: Boolean(user.email_verified_at),
     dateOfBirth: user.date_of_birth ? new Date(user.date_of_birth).toISOString().slice(0, 10) : null,
@@ -121,6 +173,7 @@ router.post('/me/sync', requireFirebaseAuthMiddleware, async (req: Request, res:
           address: parsed.data.address ?? null,
           timezone: parsed.data.timezone ?? env.TZ_DEFAULT,
           preferences: parsed.data.preferences ?? null,
+          health_info: parsed.data.healthInfo ? healthInfoCreate(parsed.data.healthInfo) : null,
           date_of_birth: dob,
         } as any);
       } catch (e) {

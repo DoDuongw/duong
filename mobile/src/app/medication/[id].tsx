@@ -295,7 +295,7 @@ export default function MedicationDetailScreen() {
             <View style={styles.timesHeader}>
               <Text style={styles.sectionTitle}>Giờ uống trong ngày</Text>
             </View>
-            <Text style={styles.muted}>Bấm vào ô giờ để chọn nhanh (giờ/phút có sẵn) hoặc nhập trực tiếp HH:mm. Bấm “Lưu thay đổi” để áp dụng — nếu đổi lịch, hệ thống sẽ hỏi xác nhận (lịch mới áp dụng cho các lần sắp tới, lịch sử giữ nguyên).</Text>
+            <Text style={styles.muted}>Bấm vào ô giờ để chọn nhanh hoặc chỉnh bằng nút − / +. Bấm “Lưu thay đổi” để áp dụng — nếu đổi lịch, hệ thống sẽ hỏi xác nhận (lịch mới áp dụng cho các lần sắp tới, lịch sử giữ nguyên).</Text>
             {times.map((entry, index) => (
               <View key={entry.key} style={styles.timeRow}>
                 <View style={{ flex: 1 }}>

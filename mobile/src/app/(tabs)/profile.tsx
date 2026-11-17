@@ -24,6 +24,13 @@ const MENU: MenuItem[] = [
     tone: colors.primary,
   },
   {
+    icon: "heart-outline",
+    title: "Tình trạng sức khỏe",
+    subtitle: "Cân nặng, chiều cao, huyết áp... (không bắt buộc)",
+    route: "/health-info",
+    tone: colors.danger,
+  },
+  {
     icon: "pulse-outline",
     title: "Nhật ký sức khỏe",
     subtitle: "Xem lại các lần hỏi thăm sau khi uống thuốc",

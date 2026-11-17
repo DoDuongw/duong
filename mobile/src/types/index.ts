@@ -13,6 +13,16 @@ export interface UserPreferences {
   [key: string]: unknown;
 }
 
+export interface UserHealthInfo {
+  weightKg?: number | null;
+  heightCm?: number | null;
+  bloodPressure?: string | null;
+  heartRate?: number | null;
+  bloodSugar?: number | null;
+  notes?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface UserProfile {
   id: string;
   phone: string | null;
@@ -21,6 +31,7 @@ export interface UserProfile {
   dateOfBirth?: string | null;
   timezone: string;
   preferences: UserPreferences | null;
+  healthInfo?: UserHealthInfo | null;
   role?: UserRole;
 }
 
