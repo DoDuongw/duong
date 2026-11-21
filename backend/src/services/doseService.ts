@@ -3,14 +3,13 @@ import { DoseOccurrence, DoseStatus } from '../models/DoseOccurrence';
 import { MedicationSchedule } from '../models/MedicationSchedule';
 import { MedicationDoc } from '../models/Medication';
 import { User } from '../models/User';
-import { AuditLog } from '../models/AuditLog';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors';
+import { writeAudit } from '../utils/audit';
 import { addMinutes, isSameLocalDay, isSameLocalDayAs, localDateTimeToUtc } from '../utils/time';
 import { env } from '../config/env';
-import { SNOOZE_MAX_DEFAULT, readSnoozeSettings } from '../utils/preferences';
+import { readSnoozeSettings } from '../utils/preferences';
 
 export const OVERDUE_AFTER_MINUTES = 15;
-export const SNOOZE_MAX = SNOOZE_MAX_DEFAULT;
 export const MISSED_AFTER_MINUTES = 30;
 
 const CONFIRMABLE: DoseStatus[] = ['pending', 'snoozed', 'overdue'];
@@ -44,13 +43,7 @@ export async function confirmDose(
       dose.is_late_confirmation = true;
       await dose.save();
     }
-    await AuditLog.create({
-      user_id: userId,
-      entity: 'dose',
-      entity_id: dose._id,
-      action: 'confirm',
-      details: { is_late: isLate },
-    });
+    await writeAudit({ user_id: userId, entity: 'dose', entity_id: dose._id, action: 'confirm', details: { is_late: isLate } });
     return dose;
   }
 
@@ -131,13 +124,7 @@ export async function cannotTakeDose(doseId: string, userId: string, reason: str
     if (!existing) throw notFound('Không tìm thấy lần uống');
     throw conflict('Lần uống đã được ghi nhận');
   }
-  await AuditLog.create({
-    user_id: userId,
-    entity: 'dose',
-    entity_id: dose._id,
-    action: 'cannot_take',
-    details: null,
-  });
+  await writeAudit({ user_id: userId, entity: 'dose', entity_id: dose._id, action: 'cannot_take' });
   return dose;
 }
 

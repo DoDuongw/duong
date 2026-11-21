@@ -4,11 +4,11 @@ import { Types } from 'mongoose';
 import { Medication, MedicationDoc } from '../models/Medication';
 import { MedicationSchedule, ScheduleDoc } from '../models/MedicationSchedule';
 import { ScheduleVersion } from '../models/ScheduleVersion';
-import { AuditLog } from '../models/AuditLog';
 import { ok } from '../middlewares/errorHandler';
 import { currentUserId, requireAuthMiddleware } from '../middlewares/auth';
 import { resolveOwnerAccess } from '../middlewares/familyAccess';
 import { badRequest, conflict, notFound } from '../utils/errors';
+import { writeAudit } from '../utils/audit';
 import {
   deleteFutureDosesForMedication,
   deleteFutureDosesForSchedule,
@@ -126,13 +126,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       schedules.push(sch);
     }
 
-    await AuditLog.create({
-      user_id: currentUserId(req),
-      entity: 'medication',
-      entity_id: med._id,
-      action: 'create',
-      details: null,
-    });
+    await writeAudit({ user_id: currentUserId(req), entity: 'medication', entity_id: med._id, action: 'create' });
 
     ok(res, medToJson(med, schedules), 201);
   } catch (e) {
@@ -181,13 +175,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     );
     if (!med) throw notFound('Không tìm thấy thuốc');
 
-    await AuditLog.create({
-      user_id: currentUserId(req),
-      entity: 'medication',
-      entity_id: med._id,
-      action: 'update',
-      details: null,
-    });
+    await writeAudit({ user_id: currentUserId(req), entity: 'medication', entity_id: med._id, action: 'update' });
 
     const schedules = await MedicationSchedule.find({ medication_id: med._id }).sort({ time_of_day: 1 });
     ok(res, medToJson(med, schedules));
@@ -213,13 +201,7 @@ router.post('/:id/discontinue', async (req: Request, res: Response, next: NextFu
     );
     // B15: lần uống tương lai chưa có kết quả bị xóa; quá khứ giữ nguyên
     const removedDoses = await deleteFutureDosesForMedication(med._id.toString(), access.ownerId);
-    await AuditLog.create({
-      user_id: currentUserId(req),
-      entity: 'medication',
-      entity_id: med._id,
-      action: 'discontinue',
-      details: { removedFutureDoses: removedDoses },
-    });
+    await writeAudit({ user_id: currentUserId(req), entity: 'medication', entity_id: med._id, action: 'discontinue', details: { removedFutureDoses: removedDoses } });
 
     ok(res, { id: med._id, status: med.status, removedFutureDoses: removedDoses });
   } catch (e) {
@@ -276,13 +258,7 @@ router.post('/:id/schedules', async (req: Request, res: Response, next: NextFunc
       changed_by: currentUserId(req),
     });
     await generateUpcomingDoses(env.DOSE_GENERATION_DAYS, access.timezone, schedule._id.toString());
-    await AuditLog.create({
-      user_id: currentUserId(req),
-      entity: 'schedule',
-      entity_id: schedule._id,
-      action: 'create',
-      details: { medicationId: med._id },
-    });
+    await writeAudit({ user_id: currentUserId(req), entity: 'schedule', entity_id: schedule._id, action: 'create', details: { medicationId: med._id } });
 
     ok(res, scheduleToJson(schedule), 201);
   } catch (e) {
@@ -302,13 +278,7 @@ router.delete('/schedules/:id', async (req: Request, res: Response, next: NextFu
     );
     if (!schedule) throw notFound('Không tìm thấy lịch');
     const removedDoses = await deleteFutureDosesForSchedule(schedule._id.toString(), access.ownerId);
-    await AuditLog.create({
-      user_id: currentUserId(req),
-      entity: 'schedule',
-      entity_id: schedule._id,
-      action: 'archive',
-      details: { removedFutureDoses: removedDoses },
-    });
+    await writeAudit({ user_id: currentUserId(req), entity: 'schedule', entity_id: schedule._id, action: 'archive', details: { removedFutureDoses: removedDoses } });
     ok(res, { id: schedule._id, status: schedule.status, removedFutureDoses: removedDoses });
   } catch (e) {
     next(e);
@@ -364,13 +334,7 @@ router.put('/schedules/:id', async (req: Request, res: Response, next: NextFunct
       access.ownerId,
       access.timezone,
     );
-    await AuditLog.create({
-      user_id: currentUserId(req),
-      entity: 'schedule',
-      entity_id: schedule._id,
-      action: 'update_version',
-      details: { version: newVersion, regeneratedDoses },
-    });
+    await writeAudit({ user_id: currentUserId(req), entity: 'schedule', entity_id: schedule._id, action: 'update_version', details: { version: newVersion, regeneratedDoses } });
 
     ok(res, { ...scheduleToJson(schedule), regeneratedDoses });
   } catch (e) {

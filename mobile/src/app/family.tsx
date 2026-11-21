@@ -26,7 +26,9 @@ import {
 } from '../services/endpoints';
 import type { DayDoses, DoseWithMedication, FamilyAlertItem, FamilyConnectionItem } from '../types';
 import {
+  BUOI_ICON,
   BUOI_LABEL,
+  BUOIS,
   buoiOfIso,
   formatDate,
   formatDisplayDate,
@@ -37,9 +39,6 @@ import {
   type Buoi,
 } from '../utils/dateTime';
 import { DOSE_STATUS_ICON, DOSE_STATUS_LABEL } from '../utils/doseStatus';
-
-const BUOIS: Buoi[] = ['sang', 'trua', 'chieu', 'toi'];
-const BUOI_ICON: Record<Buoi, string> = { sang: '🌅', trua: '☀️', chieu: '🌤️', toi: '🌙' };
 
 export default function FamilyScreen() {
   const [tab, setTab] = useState<'list' | 'join'>('list');

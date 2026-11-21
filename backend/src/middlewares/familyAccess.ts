@@ -13,8 +13,6 @@ export interface OwnerAccess {
   timezone: string;
   /** true khi người gọi là người thân đọc hộ hồ sơ khác */
   isRelative: boolean;
-  /** Người gọi có quyền thiết lập thuốc cho hồ sơ này không */
-  canManage: boolean;
 }
 
 /**
@@ -36,7 +34,7 @@ export async function resolveOwnerAccess(
     : (opts.fallbackOwnerId ?? callerId);
 
   if (requested === callerId) {
-    return { ownerId: callerId, timezone: currentTimezone(req), isRelative: false, canManage: true };
+    return { ownerId: callerId, timezone: currentTimezone(req), isRelative: false };
   }
 
   if (!Types.ObjectId.isValid(requested)) throw forbidden('Không có quyền truy cập dữ liệu này');
@@ -58,6 +56,5 @@ export async function resolveOwnerAccess(
     ownerId: requested,
     timezone: owner?.timezone || env.TZ_DEFAULT,
     isRelative: true,
-    canManage: conn.permissions.manage_medication,
   };
 }

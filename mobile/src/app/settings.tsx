@@ -472,7 +472,6 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   header: { marginBottom: 4 },
   pageTitle: { fontSize: 26, fontWeight: '800', color: colors.text, marginBottom: spacing.lg },
-  text: { ...typography.body, marginBottom: 4, color: colors.text },
   muted: { ...typography.body, color: colors.muted, marginBottom: 4 },
   label: { ...typography.bodySm, fontWeight: '700', color: colors.text, marginTop: spacing.sm, marginBottom: 6 },
   hint: { ...typography.caption, color: colors.muted, marginTop: spacing.sm, lineHeight: 18 },

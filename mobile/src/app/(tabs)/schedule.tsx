@@ -27,7 +27,9 @@ import {
 } from "../../services/endpoints";
 import type { DoseRangeDay, DoseWithMedication } from "../../types";
 import {
+  BUOI_ICON,
   BUOI_LABEL,
+  BUOIS,
   buoiOfIso,
   formatDisplayDate,
   formatTime,
@@ -38,8 +40,6 @@ import {
 } from "../../utils/dateTime";
 import { DOSE_STATUS_ICON, DOSE_STATUS_LABEL, isActionable } from "../../utils/doseStatus";
 
-const BUOI_ICON: Record<Buoi, string> = { sang: "🌅", trua: "☀️", chieu: "🌤️", toi: "🌙" };
-const BUOIS: Buoi[] = ["sang", "trua", "chieu", "toi"];
 const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 function pad2(n: number) {

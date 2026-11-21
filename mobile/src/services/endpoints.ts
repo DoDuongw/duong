@@ -272,7 +272,7 @@ export function sendTestPush(): Promise<{
   failed: number;
   total: number;
   message: string;
-  errors?: Array<{ token: string; error: string }>;
+  errors?: { token: string; error: string }[];
 }> {
   return apiFetch("/notifications/test", { method: "POST", body: {} });
 }

@@ -8,10 +8,10 @@ import { NotificationHistory } from '../models/NotificationHistory';
 import { DoseOccurrence } from '../models/DoseOccurrence';
 import { Medication } from '../models/Medication';
 import { User } from '../models/User';
-import { AuditLog } from '../models/AuditLog';
 import { ok } from '../middlewares/errorHandler';
 import { currentUserId, requireAuthMiddleware } from '../middlewares/auth';
 import { badRequest, conflict, forbidden, notFound, rateLimited } from '../utils/errors';
+import { writeAudit } from '../utils/audit';
 
 const router = Router();
 router.use(requireAuthMiddleware);
@@ -42,13 +42,7 @@ router.post('/invites', async (req: Request, res: Response, next: NextFunction) 
       status: 'pending',
     });
 
-    await AuditLog.create({
-      user_id: userId,
-      entity: 'invite',
-      entity_id: invite._id,
-      action: 'create',
-      details: { expires_at: expiresAt.toISOString() },
-    });
+    await writeAudit({ user_id: userId, entity: 'invite', entity_id: invite._id, action: 'create', details: { expires_at: expiresAt.toISOString() } });
 
     ok(res, { code, expiresAt: expiresAt.toISOString() }, 201);
   } catch (e) {
@@ -88,13 +82,7 @@ router.post('/invites/:code/accept', async (req: Request, res: Response, next: N
     });
     invite.status = 'accepted';
     await invite.save();
-    await AuditLog.create({
-      user_id: userId,
-      entity: 'connection',
-      entity_id: conn._id,
-      action: 'accept_invite',
-      details: null,
-    });
+    await writeAudit({ user_id: userId, entity: 'connection', entity_id: conn._id, action: 'accept_invite' });
 
     const owner = await User.findById(invite.owner_id);
     ok(
@@ -248,13 +236,7 @@ router.patch('/connections/:id/permissions', async (req: Request, res: Response,
     };
     conn.permissions = perms as never;
     await conn.save();
-    await AuditLog.create({
-      user_id: currentUserId(req),
-      entity: 'connection',
-      entity_id: conn._id,
-      action: 'update_permissions',
-      details: { permissions: perms },
-    });
+    await writeAudit({ user_id: currentUserId(req), entity: 'connection', entity_id: conn._id, action: 'update_permissions', details: { permissions: perms } });
     ok(res, { id: conn._id, permissions: perms });
   } catch (e) {
     next(e);
@@ -271,13 +253,7 @@ router.delete('/connections/:id', async (req: Request, res: Response, next: Next
     conn.status = 'revoked';
     conn.revoked_at = new Date();
     await conn.save();
-    await AuditLog.create({
-      user_id: userId,
-      entity: 'connection',
-      entity_id: conn._id,
-      action: 'revoke',
-      details: null,
-    });
+    await writeAudit({ user_id: userId, entity: 'connection', entity_id: conn._id, action: 'revoke' });
     ok(res, { id: conn._id, status: 'revoked' });
   } catch (e) {
     next(e);

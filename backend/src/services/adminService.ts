@@ -17,6 +17,7 @@ import {
 } from '../config/firebase';
 import { badRequest, forbidden, notFound, serviceUnavailable } from '../utils/errors';
 import { notificationErrorLabel } from '../utils/notificationLabels';
+import { writeAudit } from '../utils/audit';
 
 /**
  * Dịch vụ quản trị (chỉ đọc + khóa/mở + đặt lại mật khẩu + đổi vai trò).
@@ -298,13 +299,7 @@ export async function setUserDisabled(
   user.disabled_at = disabled ? new Date() : null;
   await user.save();
 
-  await AuditLog.create({
-    user_id: targetId,
-    entity: 'user',
-    entity_id: targetId,
-    action: disabled ? 'admin_lock' : 'admin_unlock',
-    details: { admin_id: actorId, admin_role: actorRole },
-  });
+  await writeAudit({ user_id: targetId, entity: 'user', entity_id: targetId, action: disabled ? 'admin_lock' : 'admin_unlock', details: { admin_id: actorId, admin_role: actorRole } });
 
   return { id: String(user._id), disabled: Boolean(user.disabled_at) };
 }
@@ -333,13 +328,7 @@ export async function setUserRole(
   user.role = role;
   await user.save();
 
-  await AuditLog.create({
-    user_id: targetId,
-    entity: 'user',
-    entity_id: targetId,
-    action: 'admin_set_role',
-    details: { admin_id: adminId, from: previous, to: role },
-  });
+  await writeAudit({ user_id: targetId, entity: 'user', entity_id: targetId, action: 'admin_set_role', details: { admin_id: adminId, from: previous, to: role } });
 
   return { id: String(user._id), role };
 }
@@ -373,13 +362,7 @@ export async function deleteUserPermanently(
   await FamilyConnection.deleteMany({ $or: [{ owner_id: uid }, { relative_id: uid }] });
   await NotificationLog.deleteMany({ user_id: uid });
 
-  await AuditLog.create({
-    user_id: targetId,
-    entity: 'user',
-    entity_id: targetId,
-    action: 'admin_delete_user',
-    details: { admin_id: adminId },
-  });
+  await writeAudit({ user_id: targetId, entity: 'user', entity_id: targetId, action: 'admin_delete_user', details: { admin_id: adminId } });
 
   try {
     if (user.firebase_uid && isFirebaseReady()) {

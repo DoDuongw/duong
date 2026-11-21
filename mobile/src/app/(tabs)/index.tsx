@@ -8,7 +8,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { confirmDose, getTodayDoses, newClientRequestId } from "../../services/endpoints";
 import { enablePushNotifications, getCurrentPushToken } from "../../services/notifications";
 import type { DoseWithMedication, TodayDoses } from "../../types";
-import { buoiOfIso, formatTime } from "../../utils/dateTime";
+import { BUOI_ICON, BUOI_LABEL, BUOIS, buoiOfIso, formatTime } from "../../utils/dateTime";
 import { nextActionable } from "../../utils/doseStatus";
 
 export default function HomeScreen() {
@@ -194,22 +194,17 @@ export default function HomeScreen() {
         </Section>
 
         <Section title="Lịch hôm nay theo buổi" icon="🗓️">
-          {[
-            { key: 'sang', label: 'Sáng', icon: '🌅' },
-            { key: 'trua', label: 'Trưa', icon: '☀️' },
-            { key: 'chieu', label: 'Chiều', icon: '🌤️' },
-            { key: 'toi', label: 'Tối', icon: '🌙' },
-          ].map((buoi) => (
-            <View key={buoi.key} style={styles.dayPart}>
+          {BUOIS.map((buoi) => (
+            <View key={buoi} style={styles.dayPart}>
               <View style={styles.dayPartHead}>
-                <Text style={styles.dayPartIcon}>{buoi.icon}</Text>
-                <Text style={styles.dayPartTitle}>{buoi.label}</Text>
-                <Text style={styles.dayPartCount}>{groups[buoi.key].length === 0 ? '—' : groups[buoi.key].length}</Text>
+                <Text style={styles.dayPartIcon}>{BUOI_ICON[buoi]}</Text>
+                <Text style={styles.dayPartTitle}>{BUOI_LABEL[buoi]}</Text>
+                <Text style={styles.dayPartCount}>{groups[buoi].length === 0 ? '—' : groups[buoi].length}</Text>
               </View>
-              {groups[buoi.key].length === 0 ? (
+              {groups[buoi].length === 0 ? (
                 <Text style={styles.dayPartEmpty}>Không có lần uống nào</Text>
               ) : (
-                groups[buoi.key].map((d) => (
+                groups[buoi].map((d) => (
                   <TouchableOpacity key={d.id} style={styles.doseItem} onPress={() => router.push(`/dose/${d.id}` as any)} activeOpacity={0.75}>
                     <Text style={styles.doseTime}>{formatTime(d.scheduledAt, timezone)}</Text>
                     {d.imageUrl ? <Image source={{ uri: d.imageUrl }} style={styles.doseThumb} /> : null}
@@ -424,40 +419,6 @@ const styles = StyleSheet.create({
   shortcutBtn: {
     flex: 1,
   },
-  nowActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  nowActionBtn: { flex: 1 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalTitle: { ...typography.h2, color: colors.text, marginBottom: 4 },
-  modalSub: { ...typography.bodySm, color: colors.muted, marginBottom: spacing.md },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    minHeight: 48,
-    color: colors.text,
-    backgroundColor: colors.surface2,
-    marginBottom: spacing.md,
-  },
-  modalActions: { flexDirection: 'row', gap: spacing.sm },
-  modalBtn: { flex: 1 },
   doseItem: {
     flexDirection: 'row',
     alignItems: 'center',

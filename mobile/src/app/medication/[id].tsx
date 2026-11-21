@@ -368,7 +368,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: colors.text },
   card: { marginBottom: spacing.md },
   label: { ...typography.bodySm, fontWeight: '700', color: colors.text, marginBottom: 6, marginTop: spacing.sm },
-  timeLabel: { ...typography.caption, fontWeight: '700', color: colors.muted, marginBottom: 4, marginTop: spacing.xs },
   sectionTitle: { ...typography.body, fontWeight: '800', color: colors.text, marginBottom: spacing.xs },
   muted: { ...typography.bodySm, color: colors.muted, marginBottom: spacing.xs },
   req: { color: colors.danger },

@@ -1,10 +1,19 @@
 export type Buoi = 'sang' | 'trua' | 'chieu' | 'toi';
 
+export const BUOIS: Buoi[] = ['sang', 'trua', 'chieu', 'toi'];
+
 export const BUOI_LABEL: Record<Buoi, string> = {
   sang: 'Sáng',
   trua: 'Trưa',
   chieu: 'Chiều',
   toi: 'Tối',
+};
+
+export const BUOI_ICON: Record<Buoi, string> = {
+  sang: '🌅',
+  trua: '☀️',
+  chieu: '🌤️',
+  toi: '🌙',
 };
 
 /** 00:00–09:59 sáng, 10:00–13:59 trưa, 14:00–17:59 chiều, 18:00–23:59 tối (khớp web). */
